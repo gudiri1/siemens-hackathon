@@ -110,6 +110,7 @@ python scripts/plan_path.py --target right_carotid@-5 --follow 20 --record
 python scripts/plan_path.py --variant 10Left100Right --target right_carotid@-5 --follow 20
 python scripts/plan_path.py --target right_carotid@-5 --forbid anterior_connector,left_communicating,right_communicating,right_posterior
 python scripts/plan_path.py --target left_anterior@20 --device guidewire --hard-curvature
+python scripts/compare_routes.py        # side-by-side GIF: shortest path vs device-aware plan (occluded right ICA)
 ```
 
 The pipeline has four parts (`src/stroke_nav/planning/`):

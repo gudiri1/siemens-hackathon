@@ -6,3 +6,6 @@ __pycache__/
 *.pyc
 *.egg-info/
 .pytest_cache/
+
+# organiser challenge archive (2.2 GB) - never commit
+/Hackathon.zip

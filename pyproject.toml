@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "stroke-nav"
+version = "0.1.0"
+description = "RL playground for guidewire + microcatheter navigation in patient-specific cerebrovascular anatomy (stroke thrombectomy)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "gymnasium>=1.0",
+    "stable-baselines3>=2.4",
+    "torch",
+    "matplotlib",
+    "requests",
+    "pandas",
+    "tensorboard",
+]
+
+[project.optional-dependencies]
+viz = ["pyvista", "vtk", "imageio"]
+dev = ["pytest"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]

@@ -41,13 +41,14 @@ class DeviceParams:
     w_max_deg_s: float = 180.0  # rotation speed limit
     tip_angle_deg: float = 40.0  # pre-curved tip bend
     tip_length_mm: float = 2.0  # length of the bent tip segment (for tracking points)
+    spec: str = "guidewire"  # key into stroke_nav.planning.constraints.DEVICES (diameter, clearance)
 
 
 @dataclass
 class SimParams:
     dt: float = 1.0 / 7.5  # control period (s); paper: 7.5 Hz
     guidewire: DeviceParams = field(default_factory=lambda: DeviceParams("guidewire", 40.0, 180.0, 40.0))
-    microcatheter: DeviceParams = field(default_factory=lambda: DeviceParams("microcatheter", 40.0, 180.0, 30.0))
+    microcatheter: DeviceParams = field(default_factory=lambda: DeviceParams("microcatheter", 40.0, 180.0, 30.0, spec="microcatheter"))
     branch_window_deg: float = 50.0  # tip azimuth must be within this of a side branch to enter it
     straight_cone_deg: float = 35.0  # a candidate within this of the tangent counts as "straight on"
     choice_noise: float = 0.15  # noise on azimuth score (cosine units)
@@ -57,6 +58,7 @@ class SimParams:
     lookahead_nodes: int = 5
     max_insertion_mm: float = 1500.0
     initial_insertion_mm: tuple[float, float] = (20.0, 15.0)  # (wire, catheter)
+    enforce_lumen: bool = True  # a device cannot enter lumen narrower than its clearance needs
 
     def device(self, i: int) -> DeviceParams:
         return self.guidewire if i == WIRE else self.microcatheter
@@ -69,6 +71,12 @@ class TrackSim:
         self.anat = anatomy
         self.p = params or SimParams()
         self.rng = np.random.default_rng()
+        from stroke_nav.planning.constraints import get_device
+
+        self.required_radius = np.array([
+            get_device(self.p.guidewire.spec).min_lumen_radius_mm,
+            get_device(self.p.microcatheter.spec).min_lumen_radius_mm,
+        ])
 
     # ------------------------------------------------------------------ state
     def reset(self, start_node: int, rng: np.random.Generator | None = None) -> None:
@@ -118,8 +126,9 @@ class TrackSim:
         end = self.track_s[-1]
         blocked = np.zeros(2, dtype=bool)
         for i in (WIRE, CATH):
-            if new_L[i] > end + 1e-6:
-                new_L[i] = end
+            limit = min(end, self.passable_limit(i))
+            if new_L[i] > limit + 1e-6:
+                new_L[i] = max(limit, min(old_L[i], new_L[i]))
                 if v[i] > 0:
                     blocked[i] = True
         self.wall_pushes += blocked
@@ -141,6 +150,8 @@ class TrackSim:
                 t, n1 = self._end_frame()
                 nxt = self.choose(u, prev, cands, t, n1, self.phi[leader], leader, noise=self._noise(leader))
                 self.decisions.append((u, nxt, leader))
+            if self.p.enforce_lumen and a.radius[nxt] < self.required_radius[leader]:
+                return  # lumen too narrow for the leading device: it stops here
             self._append(nxt)
 
     def _append(self, nxt: int) -> None:
@@ -156,6 +167,16 @@ class TrackSim:
         self.track_s.append(self.track_s[-1] + max(ln, 1e-3))
         self.n_ref.append(n)
         self.last_entered.append(int(nxt))
+
+    def passable_limit(self, device: int) -> float:
+        """Furthest arc length along the track this device can reach (lumen clearance)."""
+        if not self.p.enforce_lumen or len(self.track) < 2:
+            return float("inf")
+        r = self.anat.radius[self.track[1:]]
+        bad = np.where(r < self.required_radius[device])[0]
+        if len(bad) == 0:
+            return float("inf")
+        return float(self.track_s[int(bad[0])])  # stop at the last passable node
 
     def _pop_unused(self) -> None:
         m = float(self.L.max())

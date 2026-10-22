@@ -249,15 +249,71 @@ def lumen_radius(nodes_mm: np.ndarray, surface_path: Path | str, unit_scale: flo
     if inside_frac < 0.5:  # normals point inward: flip the convention
         d = -d
         inside_frac = 1.0 - inside_frac
-    radius = np.where(d < 0, -d, np.nan)  # nodes outside the wall get NaN
+    inside = d < 0
+    wall = np.where(inside, -d, np.nan)  # nodes outside the wall get NaN
+    chord = _chord_radius(nodes_mm, surf, inside)
+    # Chord radius is robust when the centerline runs off-centre; never report less than the
+    # nearest-wall distance (which is exact for a centred node).
+    radius = np.where(inside, np.fmax(chord, wall), np.nan)
     return radius, inside_frac
 
 
-def trim_outside_leaves(graph: CenterlineGraph, min_run: int = 3, min_radius: float = 0.3) -> dict[str, float]:
-    """Remove branch tails that run outside the surface model and fill interior radius gaps.
+def _chord_radius(nodes: np.ndarray, surf, inside: np.ndarray, n_dirs: int = 8, max_mm: float = 40.0) -> np.ndarray:
+    """Half the median wall-to-wall chord through each node, across the vessel cross-section.
+
+    For each node, rays are cast both ways along ``n_dirs`` directions perpendicular to the local
+    centerline tangent. Rays that leave through an opening (no wall hit) are ignored.
+    """
+    import vtk
+
+    locator = vtk.vtkStaticCellLocator()
+    locator.SetDataSet(surf)
+    locator.BuildLocator()
+    t_ref, sub_ref, cell_ref = vtk.reference(0.0), vtk.reference(0), vtk.reference(0)
+    x_hit, pcoords = [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]
+    out = np.full(len(nodes), np.nan)
+    # Tangents from neighbouring nodes (nodes are stored branch by branch, consecutive along each).
+    t = np.gradient(nodes, axis=0)
+    t /= np.maximum(np.linalg.norm(t, axis=1, keepdims=True), 1e-9)
+    angles = np.linspace(0.0, np.pi, n_dirs, endpoint=False)
+
+    def hit(p, q) -> float:
+        p_t = (float(p[0]), float(p[1]), float(p[2]))
+        q_t = (float(q[0]), float(q[1]), float(q[2]))
+        if not locator.IntersectWithLine(p_t, q_t, 0.0, t_ref, x_hit, pcoords, sub_ref, cell_ref):
+            return np.nan
+        return float(t_ref) * max_mm  # parametric distance along the ray
+
+    for i in np.where(inside)[0]:
+        ti = t[i]
+        ref = np.array([0.0, 0.0, 1.0]) if abs(ti[2]) < 0.9 else np.array([1.0, 0.0, 0.0])
+        a = np.cross(ti, ref)
+        a /= np.linalg.norm(a)
+        b = np.cross(ti, a)
+        chords = []
+        for th in angles:
+            dvec = np.cos(th) * a + np.sin(th) * b
+            h1 = hit(nodes[i], nodes[i] + max_mm * dvec)
+            h2 = hit(nodes[i], nodes[i] - max_mm * dvec)
+            if np.isfinite(h1) and np.isfinite(h2):
+                chords.append(h1 + h2)
+        if len(chords) >= 3:
+            out[i] = 0.5 * float(np.median(chords))
+    return out
+
+
+def trim_outside_leaves(
+    graph: CenterlineGraph,
+    min_run: int = 3,
+    min_radius: float = 0.05,
+    occlusion_min_mm: float = 3.0,
+    occlusion_vessel_radius: float = 1.5,
+) -> dict[str, float]:
+    """Remove branch tails that run outside the surface model and resolve interior radius gaps.
 
     Centerlines often extend past the truncated surface model. A run of outside (NaN-radius) nodes
-    touching a leaf endpoint (degree 1) is removed; remaining NaNs are interpolated along the branch.
+    touching a leaf endpoint (degree 1) is removed. Interior gaps become occlusions (radius 0) in
+    large vessels and are interpolated in small ones; occlusions are listed in ``graph.meta``.
     Returns {branch: trimmed length in mm}. Modifies ``graph`` in place.
     """
     n = len(graph.nodes)
@@ -287,16 +343,50 @@ def trim_outside_leaves(graph: CenterlineGraph, min_run: int = 3, min_radius: fl
     graph.arc = graph.arc[keep]
     graph.radius = graph.radius[keep]
 
-    # Interpolate remaining interior gaps along each branch, then clamp.
-    for b in range(len(graph.branch_names)):
+    # Interior gaps: in large vessels a long gap means the lumen is closed (e.g. 100% stenosis), so
+    # those nodes get radius 0 (impassable). In small vessels (circle of Willis) the centerline
+    # grazing the thin wall is a modelling artefact, so the radius is interpolated.
+    occluded = np.zeros(len(graph.nodes), dtype=bool)
+    occlusions = []
+    for b, name in enumerate(graph.branch_names):
         idx = np.where(graph.branch_id == b)[0]
+        idx = idx[np.argsort(graph.arc[idx])]
         r = graph.radius[idx]
         ok = np.isfinite(r)
-        if ok.any() and not ok.all():
-            graph.radius[idx] = np.interp(graph.arc[idx], graph.arc[idx][ok], r[ok])
-        elif not ok.any():
+        if not ok.any():
             graph.radius[idx] = min_radius
-    graph.radius = np.maximum(graph.radius, min_radius)
+            continue
+        if ok.all():
+            continue
+        big_vessel = float(np.median(r[ok])) >= occlusion_vessel_radius
+        bad = np.where(~ok)[0]
+        starts = [bad[0]] + [q for p, q in zip(bad[:-1], bad[1:]) if q != p + 1]
+        ends = [p for p, q in zip(bad[:-1], bad[1:]) if q != p + 1] + [bad[-1]]
+        for s, e in zip(starts, ends):
+            length = float(graph.arc[idx[e]] - graph.arc[idx[s]]) + 1.0
+            if big_vessel and length >= occlusion_min_mm and s > 0 and e < len(idx) - 1:
+                occluded[idx[s : e + 1]] = True
+                a0 = float(graph.arc[idx[s]] - graph.arc[idx].min())
+                occlusions.append({"branch": name, "from_mm": round(a0, 1), "length_mm": round(length, 1)})
+        fill = ~ok & ~occluded[idx]
+        if fill.any():
+            r = r.copy()
+            r[fill] = np.interp(graph.arc[idx][fill], graph.arc[idx][ok], r[ok])
+            graph.radius[idx] = r
+    radius = np.nan_to_num(graph.radius, nan=min_radius)
+    # Distance-to-wall underestimates the lumen where the centerline runs off-centre, which happens
+    # in thin vessels (circle of Willis). There, a ±1 mm rolling maximum removes those dips. Large
+    # vessels are left untouched: a stenosis neck can be only ~2 mm long.
+    for b in range(len(graph.branch_names)):
+        idx = np.where(graph.branch_id == b)[0]
+        idx = idx[np.argsort(graph.arc[idx])]
+        r = radius[idx]
+        if np.median(r[~occluded[idx]]) >= occlusion_vessel_radius if (~occluded[idx]).any() else True:
+            continue
+        padded = np.pad(r, 1, mode="edge")
+        radius[idx] = np.maximum(np.maximum(padded[:-2], padded[1:-1]), padded[2:])
+    graph.radius = np.where(occluded, 0.0, np.maximum(radius, min_radius))
+    graph.meta["occlusions"] = occlusions
     return trimmed
 
 
@@ -317,7 +407,10 @@ def build_model(
     verbose: bool = True,
 ) -> CenterlineGraph:
     """Parse a fetched VMR model folder and save its centerline graph as ``.npz``."""
+    from stroke_nav.data.fetch import default_variant
+
     folder = Path(raw_dir) / model
+    variant = variant or default_variant(model)
     pth_files = sorted((folder / "Paths").glob("*.pth"))
     if not pth_files:
         raise FileNotFoundError(f"no .pth files in {folder / 'Paths'}; run scripts/fetch_data.py --model {model}")
@@ -340,6 +433,10 @@ def build_model(
             if verbose and trimmed:
                 print("[build] trimmed tails outside the surface: "
                       + ", ".join(f"{k} {v:.0f} mm" for k, v in trimmed.items()))
+            if verbose:
+                for occ in graph.meta.get("occlusions", []):
+                    print(f"[build] OCCLUSION: {occ['branch']} closed for {occ['length_mm']} mm "
+                          f"starting {occ['from_mm']} mm along the branch")
         except Exception as e:  # pragma: no cover - depends on VTK install
             warnings.warn(f"radius computation failed ({e}); radius left as NaN")
     graph.meta["surface_file"] = str(vtps[0]) if vtps else None

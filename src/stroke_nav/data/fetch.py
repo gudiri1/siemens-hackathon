@@ -167,6 +167,12 @@ def relative_entry(name: str) -> str | None:
     return None
 
 
+def default_variant(name: str) -> str | None:
+    """Default surface-model variant for models that contain several (None for ordinary models)."""
+    special = SPECIAL_MODELS.get(name)
+    return special["reference_variant"] if special else None
+
+
 def model_url(name: str, variant: str | None = None) -> str:
     special = SPECIAL_MODELS.get(name)
     if special is None:

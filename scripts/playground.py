@@ -13,6 +13,8 @@ Keys (each press = one control step of 1/7.5 s at full speed):
     n / m           microcatheter rotate
     b               advance both devices
     o               one oracle step;  space: start/stop oracle autopilot
+    l               plan a device-feasible path to the target and show it (colour = planned speed)
+    h               start/stop following the planned trajectory (robot-style autopilot)
     p               (hover over the vessel) pick a point -> becomes target (or start, see g)
     g               toggle what 'p' sets: target / start
     x               reset the episode (new random target if the target spec is random)
@@ -29,13 +31,14 @@ from pathlib import Path
 
 import numpy as np
 
+from stroke_nav.agents.follower import TrajectoryFollower
 from stroke_nav.agents.scripted import ScriptedOracle
 from stroke_nav.env.vessel_env import EnvConfig, VesselNavEnv
 from stroke_nav.eval.start_metrics import episode_start_metrics, markdown_table, summarize
 
 KEYS_HELP = (
     "wire: Up/Down move, Left/Right rotate | catheter: i/k move, n/m rotate | b both\n"
-    "o oracle step, space autopilot | p pick (g: target/start) | x reset | c centerlines | z metrics | q quit"
+    "o oracle step, space autopilot | l plan path, h follow plan | p pick (g: target/start) | x reset | c centerlines | z metrics | q quit"
 )
 
 
@@ -68,7 +71,7 @@ def main() -> None:
     scene = Scene(env, pl)
     oracle = ScriptedOracle()
     oracle.reset(env)
-    state = {"auto": False, "pick": "target", "done": False, "status": ""}
+    state = {"auto": False, "pick": "target", "done": False, "status": "", "follower": None, "follow": False}
 
     def finish(info: dict) -> None:
         state["done"] = True
@@ -89,7 +92,8 @@ def main() -> None:
     def reset(options=None) -> None:
         env.reset(options=options)
         oracle.reset(env)
-        state.update(done=False, auto=False, status="")
+        state.update(done=False, auto=False, status="", follower=None, follow=False, followed=False)
+        scene.clear("plan", "plan_labels", "dijkstra")
         scene.update("", KEYS_HELP)
 
     key_actions = {
@@ -127,6 +131,50 @@ def main() -> None:
 
     pl.add_key_event("z", print_metrics)
 
+    def show_plan():
+        follower = TrajectoryFollower()
+        try:
+            follower.reset(env)
+        except ValueError as e:
+            state["status"] = f"planning failed: {e}"
+            scene.update(state["status"], KEYS_HELP)
+            return
+        traj = follower.traj
+        scene.draw_trajectory(traj)
+        from stroke_nav.planning.planner import PathPlanner
+
+        base = PathPlanner(env.anat, traj.plan.device).shortest(env.start_node, env.target_node)
+        if base.nodes and base.nodes != traj.plan.nodes:
+            scene.draw_path(base.points, name="dijkstra")
+        sm, ts = traj.plan.summary(), traj.summary()
+        print(f"[plan] {sm['device']}: {sm['branches']}  length {sm['length_mm']} mm, min lumen r "
+              f"{sm['min_lumen_radius_mm']} mm (needs {sm['required_lumen_radius_mm']}), "
+              f"{ts['rotation_events']} rotations, planned duration {ts['duration_s']} s")
+        if base.nodes and not base.feasible:
+            print(f"[plan] shortest path (grey) is not feasible: {base.message}")
+        state["follower"] = follower
+        state["status"] = (f"plan: {' > '.join(traj.plan.branches())} | {sm['length_mm']} mm, "
+                           f"{ts['duration_s']} s planned (press h to follow)")
+        scene.update(state["status"], KEYS_HELP)
+
+    def toggle_follow():
+        starting = not state["follow"]
+        if starting and (state["follower"] is None or (env.steps > 0 and not state.get("followed"))):
+            # the trajectory starts at the insertion point: restart the episode toward the same target
+            if env.steps > 0 or state["done"]:
+                reset({"target": env.target_node})
+            show_plan()
+            if state["follower"] is None:
+                return
+        state["followed"] = True
+        state["follow"] = not state["follow"] and not state["done"]
+        state["auto"] = False
+        state["status"] = "following planned trajectory" if state["follow"] else "paused"
+        scene.update(state["status"], KEYS_HELP)
+
+    pl.add_key_event("l", show_plan)
+    pl.add_key_event("h", toggle_follow)
+
     def on_pick(point, *_):
         if point is None:
             return
@@ -145,6 +193,8 @@ def main() -> None:
     def tick(*_):
         if state["auto"] and not state["done"]:
             do_step(oracle.act(env))
+        elif state["follow"] and not state["done"] and state["follower"] is not None:
+            do_step(state["follower"].act(env))
 
     pl.add_timer_event(max_steps=10_000_000, duration=60, callback=tick)
     scene.update("", KEYS_HELP)

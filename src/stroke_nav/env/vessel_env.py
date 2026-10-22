@@ -40,6 +40,7 @@ class EnvConfig:
     success_reward: float = 1.0
     wrong_branch_penalty: float = 0.0
     include_catheter_obs: bool = True
+    plan_routes: bool = True  # route = device-aware plan for the success device (else plain shortest path)
     sim: SimParams = field(default_factory=SimParams)
 
 
@@ -63,6 +64,8 @@ class VesselNavEnv(gym.Env):
         self.action_space = spaces.Box(-1.0, 1.0, shape=(4,), dtype=np.float32)
         self._target_spec = cfg.target
         self._start_spec = cfg.start
+        self._plan_cache: dict[tuple[int, int], object] = {}
+        self.plan = None
 
     # ------------------------------------------------------------------ gym API
     def reset(self, *, seed: int | None = None, options: dict | None = None):
@@ -74,15 +77,23 @@ class VesselNavEnv(gym.Env):
             self._start_spec = options["start"]
         a = self.anat
         self.start_node = a.default_start() if self._start_spec is None else a.resolve(self._start_spec, self.np_random)
+        reason = ""
         for _ in range(100):
             self.target_node = a.resolve(self._target_spec, self.np_random)
-            if np.isfinite(a.distances_from(self.target_node)[0][self.start_node]):
+            if not np.isfinite(a.distances_from(self.target_node)[0][self.start_node]):
+                reason = "target not connected to the start"
+                continue
+            self.plan = self._planned(self.start_node, self.target_node)
+            if self.plan is None or self.plan.feasible:
                 break
-        else:
-            raise ValueError(f"no reachable target for spec {self._target_spec!r}")
+            reason = self.plan.message
+            if not a.is_random(self._target_spec):
+                break
+        if reason and (self.plan is not None and not self.plan.feasible):
+            raise ValueError(f"no feasible route to target {self._target_spec!r}: {reason}")
         self.target_pos = a.nodes[self.target_node].copy()
         self.dist_to_target, _ = a.distances_from(self.target_node)
-        self.route = a.route(self.start_node, self.target_node)
+        self.route = list(self.plan.nodes) if self.plan is not None else a.route(self.start_node, self.target_node)
         self.route_set = set(self.route) | set(self._continuation(self.target_node, self.route, 20.0))
         self.route_junctions = [n for n in self.route[1:-1] if a.degree[n] >= 3]
 
@@ -153,6 +164,21 @@ class VesselNavEnv(gym.Env):
         return obs, float(reward), terminated, truncated, info
 
     # ------------------------------------------------------------------ helpers
+    def _planned(self, start: int, target: int):
+        if not self.cfg.plan_routes:
+            return None
+        key = (int(start), int(target))
+        if key not in self._plan_cache:
+            from stroke_nav.planning.planner import PathPlanner
+
+            spec = self.cfg.sim.device(self.success_dev).spec
+            if not hasattr(self, "_planner"):
+                self._planner = PathPlanner(self.anat, spec)
+            if len(self._plan_cache) > 2048:
+                self._plan_cache.clear()
+            self._plan_cache[key] = self._planner.plan(start, target)
+        return self._plan_cache[key]
+
     def _geo(self, device: int) -> float:
         i, f = self.sim.index_at(self.sim.L[device])
         tr = self.sim.track

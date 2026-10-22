@@ -58,8 +58,36 @@ class Scene:
         self.cl_actor.SetVisibility(show_centerlines)
         self.hud = None
 
+    # ------------------------------------------------------------------ planned paths
+    def draw_trajectory(self, traj, name: str = "plan", label_junctions: bool = True) -> None:
+        """Planned path as a tube coloured by the reference speed, with bifurcation labels."""
+        pv = self.pv
+        line = pv.lines_from_points(traj.points)
+        line["speed (mm/s)"] = traj.v_ref
+        tube = line.tube(radius=0.9, n_sides=12)
+        self.pl.add_mesh(tube, scalars="speed (mm/s)", cmap="turbo_r", clim=(0, float(max(traj.v_ref.max(), 1.0))),
+                         opacity=0.55, name=name, pickable=False, reset_camera=False,
+                         scalar_bar_args={"title": "mm/s", "vertical": True, "position_x": 0.88,
+                                          "position_y": 0.25, "height": 0.5, "color": "black"})
+        if label_junctions and traj.roll_events:
+            pts, labels = [], []
+            for e in traj.roll_events:
+                pts.append(self.env.anat.nodes[e["node"]])
+                labels.append(f"{e['to_branch']}  roll {e['phi_deg']:.0f}")
+            self.pl.add_point_labels(np.array(pts), labels, font_size=9, point_size=6, point_color="#7c3aed",
+                                     text_color="#4c1d95", shape_opacity=0.6, name=name + "_labels",
+                                     always_visible=True, reset_camera=False)
+
+    def draw_path(self, points: np.ndarray, color: str = "#6b7280", name: str = "baseline", radius: float = 0.5) -> None:
+        tube = self.pv.lines_from_points(points).tube(radius=radius, n_sides=8)
+        self.pl.add_mesh(tube, color=color, opacity=0.6, name=name, pickable=False, reset_camera=False)
+
+    def clear(self, *names: str) -> None:
+        for n in names:
+            self.pl.remove_actor(n, reset_camera=False)
+
     # ------------------------------------------------------------------ updates
-    def update(self, status: str = "", keys_help: str | None = None) -> None:
+    def update(self, status: str = "", keys_help: str | None = None, show_hud: bool = True) -> None:
         env, sim, pv = self.env, self.env.sim, self.pv
         for dev, color, radius, name in ((WIRE, WIRE_COLOR, 0.35, "wire"), (CATH, CATH_COLOR, 0.8, "cath")):
             pts = sim.device_polyline(dev)
@@ -74,7 +102,8 @@ class Scene:
                          name="target", pickable=False, reset_camera=False)
         self.pl.add_mesh(pv.Sphere(radius=3.0, center=env.anat.nodes[env.start_node]), color=START_COLOR,
                          name="start", pickable=False, reset_camera=False)
-        self.pl.add_text(self.hud_text(status), position="upper_left", font_size=9, name="hud", color="black")
+        if show_hud:
+            self.pl.add_text(self.hud_text(status), position="upper_left", font_size=9, name="hud", color="black")
         if keys_help:
             self.pl.add_text(keys_help, position="lower_left", font_size=8, name="keys", color="#374151")
 

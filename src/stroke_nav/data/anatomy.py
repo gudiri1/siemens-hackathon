@@ -64,7 +64,11 @@ class Anatomy:
     # ------------------------------------------------------------------ loading
     @classmethod
     def load(cls, model: str, variant: str | None = None, processed_dir: str | Path = "data/processed") -> "Anatomy":
-        """Load ``data/processed/{model}[_{variant}].npz``; if variant is None, take the only/first match."""
+        """Load ``data/processed/{model}[_{variant}].npz``; if variant is None, use the model's default
+        variant (reference variant for 0248) or the only/first match."""
+        from stroke_nav.data.fetch import default_variant
+
+        variant = variant or default_variant(model)
         path = processed_path(model, variant, processed_dir)
         if not path.exists():
             matches = sorted(Path(processed_dir).glob(f"{model}*.npz"))
@@ -118,6 +122,20 @@ class Anatomy:
     def forward_direction(self, u: int, v: int, lookahead: int = 5) -> np.ndarray:
         """Unit direction from node u into the vessel that starts with edge u->v, looking ``lookahead`` nodes ahead."""
         return _forward_direction(self, int(u), int(v), int(lookahead))
+
+    def walk_from(self, u: int, v: int, steps: int) -> int:
+        """Node reached after ``steps`` nodes starting with edge u->v, continuing along the same
+        branch where possible (else the straightest neighbour)."""
+        prev, cur = int(u), int(v)
+        for _ in range(steps - 1):
+            nxt = [w for w in self.neighbors[cur] if w != prev]
+            if not nxt:
+                break
+            same = [w for w in nxt if self.branch_id[w] == self.branch_id[cur]]
+            d0 = self.nodes[cur] - self.nodes[prev]
+            w = max(same or nxt, key=lambda w: float(np.dot(self.nodes[w] - self.nodes[cur], d0)))
+            prev, cur = cur, w
+        return cur
 
     def junctions(self) -> np.ndarray:
         return np.where(self.degree >= 3)[0]

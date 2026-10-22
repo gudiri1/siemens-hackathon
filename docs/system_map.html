@@ -1,0 +1,718 @@
+<title>stroke-nav Systemkarte</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: header, then a two-column workspace (zoomable diagram | detail + evidence panel); stacks on phones. */
+:root {
+  --bg: #eef1f3; --panel: #fafbfb; --ink: #172026; --muted: #56626c; --line: #cfd6db; --grid: #e2e7ea;
+  --core: #e7eef6; --core-b: #5b7a99; --core-t: #1d3a57;
+  --safe: #dff1ea; --safe-b: #1f8a65; --safe-t: #0d4a36;
+  --ext: #f1efe9; --ext-b: #8a8476; --ext-t: #3d3a33;
+  --io: #f6eedf; --io-b: #a77a2a; --io-t: #5a3f0f;
+  --accent: #1f8a65; --warn: #9a6212; --crit: #b42318; --flow: #d9480f;
+  --f-display: "IBM Plex Sans Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #111619; --panel: #182024; --ink: #e5eaed; --muted: #9aa6ae; --line: #2c373d; --grid: #1c2529;
+  --core: #1b2a38; --core-b: #6f93b5; --core-t: #d4e3f2;
+  --safe: #133229; --safe-b: #3fbf91; --safe-t: #c8f0e1;
+  --ext: #26241f; --ext-b: #9d9787; --ext-t: #e6e2d8;
+  --io: #2e2614; --io-b: #d0a14d; --io-t: #f3e2bf;
+  --accent: #3fbf91; --warn: #e3ab52; --crit: #f0705f; --flow: #ff8a4c; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #111619; --panel: #182024; --ink: #e5eaed; --muted: #9aa6ae; --line: #2c373d; --grid: #1c2529;
+  --core: #1b2a38; --core-b: #6f93b5; --core-t: #d4e3f2;
+  --safe: #133229; --safe-b: #3fbf91; --safe-t: #c8f0e1;
+  --ext: #26241f; --ext-b: #9d9787; --ext-t: #e6e2d8;
+  --io: #2e2614; --io-b: #d0a14d; --io-t: #f3e2bf;
+  --accent: #3fbf91; --warn: #e3ab52; --crit: #f0705f; --flow: #ff8a4c; color-scheme: dark }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-body); }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 18px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 600; margin: 0; text-wrap: balance; }
+h1 { font-size: 1.9rem; line-height: 1.15; }
+h2 { font-size: 1.2rem; }
+h3 { font-size: 1rem; }
+p { margin: 0; max-width: 70ch; }
+.eyebrow { font: 500 .72rem var(--f-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.lede { color: var(--muted); }
+.langs { display: flex; gap: 6px; }
+button, .crumb { font: 500 .85rem var(--f-body); color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 6px 11px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.lang { display: inline-flex; align-items: center; gap: 6px; font-family: var(--f-mono); font-size: .78rem; padding: 4px 9px; }
+.lang svg { border-radius: 2px; box-shadow: 0 0 0 1px var(--line); }
+.lang[aria-pressed="true"] { border-color: var(--accent); background: var(--bg); }
+html[lang="de"] .l-en, html:not([lang="de"]) .l-de { display: none; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.crumbs { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; font-size: .85rem; }
+.crumbs .sep { color: var(--muted); }
+.crumb[aria-current="page"] { border-color: var(--accent); cursor: default; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#flowBtn { background: var(--flow); border-color: var(--flow); color: #fff; }
+.work { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+@media (max-width: 980px) { .work { grid-template-columns: 1fr; } }
+.stage { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; min-width: 0; }
+.scroller { overflow-x: auto; }
+.stage svg { display: block; width: 100%; min-width: 720px; height: auto; touch-action: manipulation; }
+.viewhead { padding: 12px 16px 0; display: flex; flex-direction: column; gap: 2px; }
+.viewhead .sub { color: var(--muted); font-size: .88rem; }
+.caption { margin: 0 12px 12px; background: var(--ink); color: var(--bg); border-radius: 8px;
+  padding: 8px 12px; font-size: .9rem; display: flex; gap: 10px; align-items: baseline; }
+.caption b { font-family: var(--f-mono); font-weight: 500; color: var(--flow); }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; padding: 0 16px 12px; font-size: .8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -2px; border: 1.5px solid; }
+.side { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+.card .file { font: .78rem var(--f-mono); color: var(--muted); overflow-wrap: anywhere; }
+.card ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; font-size: .88rem; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; }
+.ev { display: flex; flex-direction: column; gap: 10px; }
+.evi { display: flex; flex-direction: column; gap: 4px; }
+.evi .lab { font-size: .86rem; }
+.evi .nums { font: 500 .8rem var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.evi .track { display: grid; grid-template-columns: 54px 1fr; gap: 3px 8px; align-items: center; font: .72rem var(--f-mono); color: var(--muted); }
+.evi .b { height: 9px; border-radius: 0 3px 3px 0; min-width: 2px; }
+.evi .b.before { background: var(--crit); opacity: .75; }
+.evi .b.after { background: var(--accent); }
+.note { font-size: .82rem; color: var(--muted); }
+.status { display: flex; flex-wrap: wrap; gap: 6px 14px; font: .78rem/1.4 var(--f-mono); color: var(--muted); }
+.status b { font-weight: 500; color: var(--ink); }
+.status .ok { color: var(--accent); } .status .bad { color: var(--crit); }
+.drift ul { font: .78rem var(--f-mono); overflow-wrap: anywhere; }
+.drift .ok { color: var(--accent); } .drift .bad { color: var(--crit); }
+/* SVG */
+.edge { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.edge.safety { stroke: var(--safe-b); stroke-width: 1.8; }
+.edge.dashed { stroke-dasharray: 5 4; }
+.edge.hot { stroke: var(--flow); stroke-width: 2.6; }
+.elabel { font: 500 11px var(--f-mono); fill: var(--muted); paint-order: stroke; stroke: var(--panel); stroke-width: 4px; stroke-linejoin: round; }
+.elabel.hot { fill: var(--flow); }
+.node rect.box { stroke-width: 1.5; }
+.node .t { font: 600 14px var(--f-display); }
+.node .d { font: 400 11.5px var(--f-body); }
+.node .z { font: 500 10.5px var(--f-mono); }
+.node.zoomable { cursor: zoom-in; }
+.node:not(.zoomable) { cursor: pointer; }
+.node:hover rect.box, .node.sel rect.box { stroke-width: 2.6; }
+.node.warn rect.box { stroke: var(--crit); stroke-dasharray: none; }
+.node.missing rect.box { stroke: var(--crit); stroke-dasharray: 2 3; stroke-width: 2.2; }
+.node .miss { font: 600 10.5px var(--f-mono); fill: var(--crit); }
+.node.hot rect.box { stroke: var(--flow); stroke-width: 3; }
+.k-core rect.box { fill: var(--core); stroke: var(--core-b); } .k-core text { fill: var(--core-t); }
+.k-safety rect.box { fill: var(--safe); stroke: var(--safe-b); } .k-safety text { fill: var(--safe-t); }
+.k-ext rect.box { fill: var(--ext); stroke: var(--ext-b); stroke-dasharray: 6 4; } .k-ext text { fill: var(--ext-t); }
+.k-io rect.box { fill: var(--io); stroke: var(--io-b); } .k-io text { fill: var(--io-t); }
+.group { fill: none; stroke: var(--safe-b); stroke-width: 1.2; stroke-dasharray: 3 4; }
+.gl { font: 500 11px var(--f-mono); fill: var(--safe-b); letter-spacing: .06em; }
+.token { fill: var(--flow); }
+#scene { transition: opacity .18s ease; }
+#scene.fade { opacity: 0; }
+@media (prefers-reduced-motion: reduce) { #scene { transition: none; } }
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <div class="eyebrow"><span class="l-de">Siemens-Hackathon · Repo stroke-nav · Safety-Layer</span><span class="l-en">Siemens hackathon · stroke-nav repo · safety layer</span></div>
+      <h1><span class="l-de">Systemkarte: vom Gefäßmodell bis zur abgesicherten Bewegung</span><span class="l-en">System map: from vessel model to a safeguarded motion</span></h1>
+      <p class="lede"><span class="l-de">Klicke auf einen Block mit „⤢“, um hineinzuzoomen. „Ablauf abspielen“ zeigt einen Steuerzyklus als Fluss. Rechts stehen Details und die gemessene Wirkung, Schwellen, Tests und Messwerte werden bei jedem Push automatisch aus dem Repo neu erzeugt.</span><span class="l-en">Click a block marked “⤢” to zoom in. “Play the cycle” animates one control cycle. The panel on the right shows details and the measured effect; thresholds, tests and measurements are regenerated from the repo on every push.</span></p>
+      <div class="status" id="status"></div>
+    </div>
+    <div class="langs" role="group" aria-label="Language / Sprache">
+      <button type="button" class="lang" data-lang="en" aria-label="English"><svg viewBox="0 0 60 30" width="22" height="11" aria-hidden="true"><clipPath id="uk"><path d="M0,0v30h60V0z"/></clipPath><g clip-path="url(#uk)"><path d="M0,0v30h60V0z" fill="#012169"/><path d="M0,0 60,30M60,0 0,30" stroke="#fff" stroke-width="6"/><path d="M0,0 60,30M60,0 0,30" stroke="#C8102E" stroke-width="2.4"/><path d="M30,0v30M0,15h60" stroke="#fff" stroke-width="10"/><path d="M30,0v30M0,15h60" stroke="#C8102E" stroke-width="6"/></g></svg>EN</button>
+      <button type="button" class="lang" data-lang="de" aria-label="Deutsch"><svg viewBox="0 0 5 3" width="18" height="11" aria-hidden="true"><path fill="#000" d="M0 0h5v1H0z"/><path fill="#D00" d="M0 1h5v1H0z"/><path fill="#FFCE00" d="M0 2h5v1H0z"/></svg>DE</button>
+    </div>
+  </div>
+
+  <div class="bar">
+    <nav class="crumbs" id="crumbs" aria-label="Zoom path"></nav>
+    <div class="actions">
+      <button type="button" id="flowBtn"></button>
+      <button type="button" id="evBtn"></button>
+    </div>
+  </div>
+
+  <div class="work">
+    <div class="stage">
+      <div class="viewhead"><h2 id="vTitle"></h2><div class="sub" id="vSub"></div></div>
+      <div class="scroller"><svg id="dia" viewBox="0 0 1000 600" role="img" aria-labelledby="vTitle">
+        <defs>
+          <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M1 1L9 5L1 9z" fill="context-stroke"/></marker>
+        </defs>
+        <g id="scene"></g>
+      </svg></div>
+      <div class="caption" id="caption" hidden><b id="capStep"></b><span id="capText"></span></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <aside class="side" aria-live="polite">
+      <div class="card" id="detail"></div>
+      <div class="card" id="evidence"></div>
+      <div class="card drift" id="drift"></div>
+    </aside>
+  </div>
+</div>
+
+<!-- Filled in by scripts/build_system_map.py (CI: .github/workflows/system-map.yml). Do not edit by hand. -->
+<script type="application/json" id="repo-data">{"built":"2026-10-22T20:31:28+00:00","ci":false,"commit":{"sha":"bfcd8055c99a4bc73059ebc47e37c0f4b38aa242","date":"2026-10-22T20:59:41+01:00","subject":"Add runtime safety layer: monitor (R1-R6 + operator override), fault injection, safety metrics and evaluation","branch":"system-map"},"tests":{"ran":false,"files":{"test_data":{"defined":7},"test_env":{"defined":8},"test_organiser":{"defined":13},"test_planning":{"defined":11},"test_safety":{"defined":15},"test_system_map":{"defined":3}},"defined":57,"passed":0,"failed":0,"skipped":0},"config":{"speed_zones":[[5.0,1.0],[2.0,0.5],[0.0,0.25]],"junction_fraction":0.3,"junction_before_mm":8.0,"junction_after_mm":12.0,"force_limit_N":0.8,"backoff_steps":2,"backoff_speed":0.15,"corridor_mm":4.0,"hold_after_dropouts":2,"jump_margin_mm":3.0,"overshoot_mm":10.0,"catheter_overtake_mm":0.0},"faults":{"clean":{"sigma_mm":0.0,"dropout_p":0.0,"burst_max":1,"fast_mm_s":25.0,"fast_extra_p":0.0,"latency_steps":0},"organiser":{"sigma_mm":0.1,"dropout_p":0.07,"burst_max":1,"fast_mm_s":25.0,"fast_extra_p":0.0,"latency_steps":1},"stress":{"sigma_mm":1.0,"dropout_p":0.08,"burst_max":5,"fast_mm_s":25.0,"fast_extra_p":0.25,"latency_steps":1}},"inventory":["scripts/build_system_map.py","scripts/check_handover.py","scripts/compare_routes.py","scripts/evaluate.py","scripts/evaluate_safety.py","scripts/export_handover.py","scripts/fetch_data.py","scripts/plan_path.py","scripts/playground.py","scripts/plot_anatomy.py","scripts/train_sac.py","src/stroke_nav/agents/follower.py","src/stroke_nav/agents/scripted.py","src/stroke_nav/data/anatomy.py","src/stroke_nav/data/centerline.py","src/stroke_nav/data/fetch.py","src/stroke_nav/env/devices.py","src/stroke_nav/env/vessel_env.py","src/stroke_nav/eval/start_metrics.py","src/stroke_nav/organiser/env.py","src/stroke_nav/organiser/export.py","src/stroke_nav/organiser/fluoro.py","src/stroke_nav/organiser/frame.py","src/stroke_nav/organiser/spec.py","src/stroke_nav/organiser/templates/ros2_device_command_player.py","src/stroke_nav/organiser/templates/ros2_twist_player.py","src/stroke_nav/planning/constraints.py","src/stroke_nav/planning/planner.py","src/stroke_nav/planning/trajectory.py","src/stroke_nav/safety/demo_anatomy.py","src/stroke_nav/safety/faults.py","src/stroke_nav/safety/monitor.py","src/stroke_nav/safety/report.py","src/stroke_nav/safety/shield.py","src/stroke_nav/viz/scene.py"],"safety":{"follower · clean · no monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":14.119999999999996,"wrong_branch_entries":0.0,"wrong_depth_mean_mm":0.0,"wrong_depth_worst_mm":0.0,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":6.981689286618291,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.000000000000284,"speed_jumps":0.0,"off_corridor_steps":0.0,"dropouts":0.0,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"follower · clean · monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":19.92,"wrong_branch_entries":0.0,"wrong_depth_mean_mm":0.0,"wrong_depth_worst_mm":0.0,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":6.981689301984034,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000007,"speed_jumps":0.0,"off_corridor_steps":0.0,"dropouts":0.0,"steps_intervened":113.3,"fired_R1":113.3,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"follower · organiser · no monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":14.119999999999996,"wrong_branch_entries":0.0,"wrong_depth_mean_mm":0.0,"wrong_depth_worst_mm":0.0,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":6.981689286618291,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.000000000000284,"speed_jumps":0.0,"off_corridor_steps":0.0,"dropouts":7.5,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"follower · organiser · monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":19.98,"wrong_branch_entries":0.0,"wrong_depth_mean_mm":0.0,"wrong_depth_worst_mm":0.0,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":6.981689301984034,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000019,"speed_jumps":0.0,"off_corridor_steps":0.0,"dropouts":11.35,"steps_intervened":113.85,"fired_R1":113.25,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.6,"fired_R5":0.0,"fired_R6":0.0},"follower · stress · no monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":14.119999999999996,"wrong_branch_entries":0.0,"wrong_depth_mean_mm":0.0,"wrong_depth_worst_mm":0.0,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":6.981689286618291,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.000000000000284,"speed_jumps":0.0,"off_corridor_steps":0.0,"dropouts":45.4,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"follower · stress · monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":26.04666666666667,"wrong_branch_entries":1.55,"wrong_depth_mean_mm":3.5837158856275506,"wrong_depth_worst_mm":4.48148131059844,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":6.981689286618746,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000019,"speed_jumps":0.0,"off_corridor_steps":0.05,"dropouts":53.5,"steps_intervened":153.3,"fired_R1":116.35,"fired_R2":0.0,"fired_R3":0.75,"fired_R4":36.85,"fired_R5":0.0,"fired_R6":0.0},"sloppy · clean · no monitor":{"n":20,"success_pct":60.0,"success_ci":[38.65779423152061,78.11960325858074],"time_s_success":16.1,"wrong_branch_entries":2.75,"wrong_depth_mean_mm":3.462567199203208,"wrong_depth_worst_mm":4.833333333333343,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":11.648707967654559,"overshoot_exceed_pct":40.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000079,"speed_jumps":0.0,"off_corridor_steps":0.6,"dropouts":0.0,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"sloppy · clean · monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":20.96,"wrong_branch_entries":1.5,"wrong_depth_mean_mm":2.420456029383952,"wrong_depth_worst_mm":4.300000190734835,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":9.211978348482944,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000007,"speed_jumps":0.0,"off_corridor_steps":0.0,"dropouts":0.0,"steps_intervened":119.3,"fired_R1":119.3,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"sloppy · organiser · no monitor":{"n":20,"success_pct":60.0,"success_ci":[38.65779423152061,78.11960325858074],"time_s_success":16.1,"wrong_branch_entries":2.75,"wrong_depth_mean_mm":3.462567199203208,"wrong_depth_worst_mm":4.833333333333343,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":11.648707967654559,"overshoot_exceed_pct":40.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000079,"speed_jumps":0.0,"off_corridor_steps":0.6,"dropouts":17.25,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"sloppy · organiser · monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":21.019999999999996,"wrong_branch_entries":1.5,"wrong_depth_mean_mm":2.420456029383952,"wrong_depth_worst_mm":4.300000190734835,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":9.211978348483001,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000039,"speed_jumps":0.0,"off_corridor_steps":0.0,"dropouts":11.85,"steps_intervened":119.85,"fired_R1":119.25,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.6,"fired_R5":0.0,"fired_R6":0.0},"sloppy · stress · no monitor":{"n":20,"success_pct":60.0,"success_ci":[38.65779423152061,78.11960325858074],"time_s_success":16.1,"wrong_branch_entries":2.75,"wrong_depth_mean_mm":3.462567199203208,"wrong_depth_worst_mm":4.833333333333343,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":11.648707967654559,"overshoot_exceed_pct":40.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000079,"speed_jumps":0.0,"off_corridor_steps":0.6,"dropouts":121.3,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"sloppy · stress · monitor":{"n":20,"success_pct":100.0,"success_ci":[83.88698745050667,100.0],"time_s_success":27.160000000000004,"wrong_branch_entries":3.3,"wrong_depth_mean_mm":3.9269949882669977,"wrong_depth_worst_mm":4.48148119138915,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":9.211978348482944,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000019,"speed_jumps":0.0,"off_corridor_steps":0.1,"dropouts":60.35,"steps_intervened":165.7,"fired_R1":123.55,"fired_R2":0.0,"fired_R3":1.2,"fired_R4":41.95,"fired_R5":0.0,"fired_R6":0.0},"forward · clean · no monitor":{"n":20,"success_pct":0.0,"success_ci":[0.0,16.113012549493323],"time_s_success":null,"wrong_branch_entries":1.0,"wrong_depth_mean_mm":87.06544515800928,"wrong_depth_worst_mm":93.06950239530931,"wrong_depth_exceed_pct":100.0,"wall_pushes":701.0,"wall_push_eps_pct":100.0,"overshoot_worst_mm":-59.885187194440675,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.000000000000284,"speed_jumps":0.0,"off_corridor_steps":366.8,"dropouts":0.0,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"forward · clean · monitor":{"n":20,"success_pct":0.0,"success_ci":[0.0,16.113012549493323],"time_s_success":null,"wrong_branch_entries":1.0,"wrong_depth_mean_mm":5.6693792210762295,"wrong_depth_worst_mm":5.913436229494465,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":-147.04125336025552,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000007,"speed_jumps":0.0,"off_corridor_steps":354.4,"dropouts":0.0,"steps_intervened":371.0,"fired_R1":371.0,"fired_R2":0.0,"fired_R3":353.4,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":1.0},"forward · organiser · no monitor":{"n":20,"success_pct":0.0,"success_ci":[0.0,16.113012549493323],"time_s_success":null,"wrong_branch_entries":1.0,"wrong_depth_mean_mm":87.06544515800928,"wrong_depth_worst_mm":93.06950239530931,"wrong_depth_exceed_pct":100.0,"wall_pushes":701.0,"wall_push_eps_pct":100.0,"overshoot_worst_mm":-59.885187194440675,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.000000000000284,"speed_jumps":0.0,"off_corridor_steps":366.8,"dropouts":29.5,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"forward · organiser · monitor":{"n":20,"success_pct":0.0,"success_ci":[0.0,16.113012549493323],"time_s_success":null,"wrong_branch_entries":1.0,"wrong_depth_mean_mm":7.349379287833422,"wrong_depth_worst_mm":9.113436356651022,"wrong_depth_exceed_pct":0.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":-145.44125329667725,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000007,"speed_jumps":0.0,"off_corridor_steps":354.25,"dropouts":29.5,"steps_intervened":371.0,"fired_R1":368.95,"fired_R2":0.0,"fired_R3":350.3,"fired_R4":2.05,"fired_R5":0.0,"fired_R6":1.0},"forward · stress · no monitor":{"n":20,"success_pct":0.0,"success_ci":[0.0,16.113012549493323],"time_s_success":null,"wrong_branch_entries":1.0,"wrong_depth_mean_mm":87.06544515800928,"wrong_depth_worst_mm":93.06950239530931,"wrong_depth_exceed_pct":100.0,"wall_pushes":701.0,"wall_push_eps_pct":100.0,"overshoot_worst_mm":-59.885187194440675,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.000000000000284,"speed_jumps":0.0,"off_corridor_steps":366.8,"dropouts":101.85,"steps_intervened":0.0,"fired_R1":0.0,"fired_R2":0.0,"fired_R3":0.0,"fired_R4":0.0,"fired_R5":0.0,"fired_R6":0.0},"forward · stress · monitor":{"n":20,"success_pct":0.0,"success_ci":[0.0,16.113012549493323],"time_s_success":null,"wrong_branch_entries":1.0,"wrong_depth_mean_mm":8.54937933551713,"wrong_depth_worst_mm":10.7134364202293,"wrong_depth_exceed_pct":5.0,"wall_pushes":0.0,"wall_push_eps_pct":0.0,"overshoot_worst_mm":-143.84125323309897,"overshoot_exceed_pct":0.0,"unsupported_cath_mm":0.0,"unsupported_cath_eps_pct":0.0,"tip_speed_worst_mm_s":40.00000000000007,"speed_jumps":0.0,"off_corridor_steps":334.75,"dropouts":97.2,"steps_intervened":371.0,"fired_R1":303.9,"fired_R2":0.0,"fired_R3":284.55,"fired_R4":67.05,"fired_R5":0.0,"fired_R6":1.0}},"safety_episodes":20}</script>
+
+<script>
+(() => {
+const $ = id => document.getElementById(id);
+let LANG = 'de';
+try { LANG = localStorage.getItem('snmap-lang') || 'de'; } catch (e) {}
+const NS = 'http://www.w3.org/2000/svg';
+let REPO = {};
+try { REPO = JSON.parse($('repo-data').textContent) || {}; } catch (e) {}
+const INV = REPO.inventory || [];
+const S = REPO.safety || null;
+const num = v => {
+  if (typeof v === 'string') return v;
+  if (v == null || Number.isNaN(v)) return '–';
+  const d = Math.abs(v) < 1 ? 2 : 1, r = Math.round(v * 10 ** d) / 10 ** d, t = String(r);
+  return LANG === 'de' ? t.replace('.', ',') : t;
+};
+const col = (pol, fault, mon) => (S && S[`${pol} · ${fault} · ${mon ? 'monitor' : 'no monitor'}`]) || null;
+const pair = (pol, fault, key) => { const a = col(pol, fault, false), b = col(pol, fault, true); return a && b ? [a[key], b[key]] : null; };
+// values the texts refer to as {name}; all read from the repo, so the page follows the code
+const P = (() => {
+  const c = REPO.config || {}, F = REPO.faults || {}, o = F.organiser || {}, st = F.stress || {}, t = REPO.tests || {};
+  const pct = x => (x == null ? null : Math.round(x * 100));
+  const fol = pair('follower', 'stress', 'time_s_success'), push = pair('forward', 'clean', 'wall_push_eps_pct'), over = pair('sloppy', 'organiser', 'overshoot_exceed_pct');
+  const r2 = S ? Math.max(0, ...Object.entries(S).filter(([k]) => k.endsWith('· monitor')).map(([, v]) => v.fired_R2 || 0)) : null;
+  return {
+    zones: (c.speed_zones || []).map(z => Math.round(z[1] * 100)).join('/') || null, junction_pct: pct(c.junction_fraction),
+    force_limit_N: c.force_limit_N, backoff_steps: c.backoff_steps, backoff_speed: c.backoff_speed, corridor_mm: c.corridor_mm,
+    hold_after_dropouts: c.hold_after_dropouts, overshoot_mm: c.overshoot_mm,
+    org_sigma: o.sigma_mm, org_drop: pct(o.dropout_p), org_lat: o.latency_steps, st_sigma: st.sigma_mm, st_burst: st.burst_max,
+    st_fast: pct(st.fast_extra_p), fast_mm_s: st.fast_mm_s,
+    tests_total: t.ran ? t.passed + t.failed : t.defined, tests_passed: t.passed, tests_failed: t.failed,
+    fol_t: fol && fol[0], fol_t_mon: fol && fol[1], fol_succ: col('follower', 'stress', true)?.success_pct,
+    push_b: push && push[0], push_a: push && push[1], over_b: over && over[0], over_a: over && over[1], r2_max: r2,
+  };
+})();
+const F = str => str.replace(/\{([A-Za-z0-9_]+)\}/g, (m, k) => (k in P ? num(P[k]) : m));
+const T = x => { if (typeof x === 'function') x = x(); return x == null ? '' : F(typeof x === 'string' ? x : (x[LANG] ?? x.en ?? x.de)); };
+
+// ------------------------------------------------------------------ evidence (measured today, synthetic arch, 20 paired episodes)
+const EV = {
+  blind: { label: { de: 'Blinder Regler (nur vorschieben): tiefster Eintritt in falsches Gefäß', en: 'Blind controller (push only): deepest entry into a wrong vessel' }, unit: 'mm',
+    get: () => pair('forward', 'clean', 'wrong_depth_worst_mm'),
+    note: () => { const c = col('forward', 'stress', true); return c && { de: `saubere Bildgebung; mit starken Störungen ${num(c.wrong_depth_worst_mm)} mm`, en: `clean imaging; ${num(c.wrong_depth_worst_mm)} mm under stress faults` }; } },
+  pushes: { label: { de: 'Blinder Regler: Episoden mit Wandstoß', en: 'Blind controller: episodes with a blocked push' }, unit: '%', get: () => pair('forward', 'clean', 'wall_push_eps_pct') },
+  sloppySucc: { label: { de: 'Unsauberer Regler: Erfolgsrate (Organisator-Störungen)', en: 'Imperfect controller: success rate (organiser faults)' }, unit: '%', get: () => pair('sloppy', 'organiser', 'success_pct') },
+  sloppyOver: { label: { de: 'Unsauberer Regler: Episoden > {overshoot_mm} mm über das Ziel', en: 'Imperfect controller: episodes > {overshoot_mm} mm past target' }, unit: '%', get: () => pair('sloppy', 'organiser', 'overshoot_exceed_pct') },
+  follower: { label: { de: 'Guter Regler (A*-Follower): Erfolgsrate unter starken Störungen', en: 'Good controller (A* follower): success under stress faults' }, unit: '%', get: () => pair('follower', 'stress', 'success_pct'),
+    note: { de: 'Preis: {fol_t} → {fol_t_mon} s Prozedurzeit', en: 'cost: {fol_t} → {fol_t_mon} s procedure time' } },
+  r4holds: { label: { de: 'R4 hält bei Tracking-Verlust (Follower, starke Störungen)', en: 'R4 holds on tracking loss (follower, stress faults)' }, unit: { de: 'Schritte/Ep.', en: 'steps/ep.' }, value: () => col('follower', 'stress', true)?.fired_R4 },
+  // one-off measurements during development (the defect versions are not in the repo any more)
+  deadlock: { hist: 1, label: { de: 'Defekt 1, Deadlock: Follower + Störungen + Monitor, Erfolgsrate', en: 'Defect 1, deadlock: follower + faults + monitor, success' }, unit: '%', before: 0, after: 100, tagBefore: { de: 'vor Fix', en: 'before fix' }, tagAfter: { de: 'nach Fix', en: 'after fix' }, note: { de: 'Plausibilitätsprüfung gegen Encoder statt gegen einen Schritt', en: 'plausibility bounded by encoder travel, not one step' } },
+  junction: { hist: 1, label: { de: 'Defekt 2, Latenz: tiefster Fehleintritt unter starken Störungen', en: 'Defect 2, latency: deepest wrong entry under stress faults' }, unit: 'mm', before: 20.8, after: 10.7, tagBefore: { de: 'nur Korridor', en: 'corridor only' }, tagAfter: { de: '+ Langsamzone', en: '+ slow zone' } },
+};
+
+// ------------------------------------------------------------------ views
+// kinds: core (repo component), safety (safety layer), ext (organiser stack), io (inputs/outputs, people)
+const V = {
+ system: {
+  title: { de: 'Gesamtbild: Regelkreis mit Safety-Layer', en: 'Big picture: control loop with a safety layer' },
+  sub: { de: 'Jede Bewegung läuft durch den Safety-Layer. Er sieht nur, was ein echtes System misst, und darf Befehle nur abschwächen.', en: 'Every motion passes through the safety layer. It sees only what a real system measures and may only weaken commands.' },
+  nodes: [
+   { id: 'data', x: 20, y: 50, w: 170, h: 100, k: 'core', zoom: 'data', f: ['src/stroke_nav/data/', 'scripts/fetch_data.py', 'scripts/plot_anatomy.py'], t: { de: 'Anatomie & Daten', en: 'Anatomy & data' }, d: { de: 'VMR 0248, Mittellinien, Radius, Verschlüsse', en: 'VMR 0248, centerlines, radius, occlusions' } },
+   { id: 'plan', x: 250, y: 50, w: 180, h: 100, k: 'core', zoom: 'plan', f: ['src/stroke_nav/planning/', 'scripts/plan_path.py'], t: { de: 'Planung (A*)', en: 'Planning (A*)' }, d: { de: 'gerätegerechte Route, Tempo-Profil, Rollwinkel', en: 'device-aware route, speed profile, roll angles' } },
+   { id: 'control', x: 505, y: 50, w: 180, h: 100, k: 'core', zoom: 'control', f: ['src/stroke_nav/agents/', 'scripts/train_sac.py'], t: { de: 'Regler (Doer)', en: 'Controller (doer)' }, d: { de: 'A*-Follower · Skript · RL-Policy (SAC)', en: 'A* follower · scripted · RL policy (SAC)' } },
+   { id: 'operator', x: 820, y: 50, w: 160, h: 100, k: 'io', t: { de: 'Arzt / Operator', en: 'Physician / operator' }, d: { de: 'Override hat immer Vorrang', en: 'override always wins' } },
+   { id: 'safety', x: 425, y: 240, w: 340, h: 110, k: 'safety', zoom: 'safety', f: ['src/stroke_nav/safety/'], t: { de: 'Safety-Layer (Checker)', en: 'Safety layer (checker)' }, d: { de: 'Fehlerinjektion · Monitor R1–R6 · Gym-Wrapper · Safety-Metriken', en: 'fault injection · monitor R1–R6 · Gym wrapper · safety metrics' } },
+   { id: 'meas', x: 840, y: 240, w: 140, h: 110, k: 'io', zoom: 'faults', t: { de: 'Messung', en: 'Measurement' }, d: { de: 'Encoder, Spitze, Dropout, Kraft — gestört', en: 'encoders, tip, dropout, force — corrupted' } },
+   { id: 'eval', x: 20, y: 450, w: 200, h: 100, k: 'core', zoom: 'eval', f: ['src/stroke_nav/eval/', 'src/stroke_nav/viz/', 'scripts/evaluate.py', 'scripts/evaluate_safety.py', 'scripts/compare_routes.py', 'scripts/build_system_map.py'], t: { de: 'Bewertung', en: 'Evaluation' }, d: { de: 'START- und Safety-Metriken, Routen-GIF, {tests_total} Tests', en: 'START and safety metrics, route GIF, {tests_total} tests' } },
+   { id: 'org', x: 265, y: 450, w: 185, h: 100, k: 'ext', zoom: 'org', f: ['src/stroke_nav/organiser/', 'scripts/export_handover.py', 'scripts/check_handover.py'], t: { de: 'Organisator-Stack', en: 'Organiser stack' }, d: { de: 'ROS 2, Arbiter, XPBD-Sim, SAC — gleiche Schnittstelle', en: 'ROS 2, arbiter, XPBD sim, SAC — same interface' } },
+   { id: 'sim', x: 505, y: 450, w: 180, h: 100, k: 'core', zoom: 'sim', f: ['src/stroke_nav/env/', 'scripts/playground.py'], t: { de: 'Simulator / Roboter', en: 'Simulator / robot' }, d: { de: 'TrackSim (kinematisch), später XPBD + Roboter', en: 'TrackSim (kinematic), later XPBD + robot' } },
+  ],
+  edges: [
+   { id: 'e1', a: 'data', b: 'plan', l: { de: 'Graph', en: 'graph' } },
+   { id: 'e2', a: 'plan', b: 'control', l: 'route' },
+   { id: 'e3', a: 'plan', b: 'safety', s: 1, l: { de: 'Korridor', en: 'corridor' }, ap: [340, 150], via: [[340, 195], [470, 195]], bp: [470, 240], lp: [405, 190] },
+   { id: 'e4', a: 'control', b: 'safety', s: 1, l: { de: 'Aktion a', en: 'action a' }, ap: [595, 150], bp: [595, 240], lp: [595, 200] },
+   { id: 'e5', a: 'operator', b: 'safety', s: 1, l: 'override', ap: [900, 150], via: [[900, 195], [740, 195]], bp: [740, 240], lp: [820, 190] },
+   { id: 'e6', a: 'safety', b: 'sim', s: 1, l: { de: 'nur a′ ≤ a', en: 'only a′ ≤ a' }, ap: [595, 350], bp: [595, 450], lp: [595, 405] },
+   { id: 'e7', a: 'sim', b: 'meas', l: { de: 'Zustand', en: 'state' }, ap: [685, 500], via: [[910, 500]], bp: [910, 350], lp: [790, 495] },
+   { id: 'e8', a: 'meas', b: 'safety', s: 1, l: { de: 'Messung', en: 'measured' }, ap: [840, 295], bp: [765, 295], lp: [802, 289] },
+   { id: 'e9', a: 'meas', b: 'control', l: { de: 'Beobachtung (gestört)', en: 'observation (corrupted)' }, ap: [980, 295], via: [[993, 295], [993, 22], [640, 22]], bp: [640, 50], lp: [820, 17] },
+   { id: 'e10', a: 'sim', b: 'eval', l: { de: 'Episoden', en: 'episodes' }, ap: [560, 550], via: [[560, 582], [120, 582]], bp: [120, 550], lp: [340, 577] },
+   { id: 'e11', a: 'safety', b: 'eval', s: 1, l: { de: 'Eingriffe je Regel', en: 'interventions per rule' }, ap: [425, 320], via: [[120, 320]], bp: [120, 450], lp: [280, 315] },
+   { id: 'e12', a: 'sim', b: 'org', d: 1, ap: [505, 500], bp: [450, 500] },
+  ],
+  flow: [
+   { e: ['e1'], c: { de: 'Anatomie laden; A* plant eine Route, die das Device auch passieren kann.', en: 'Load the anatomy; A* plans a route the device can actually pass.' } },
+   { e: ['e2', 'e3'], c: { de: 'Die Route geht an den Regler — und als freigegebener Korridor an den Monitor.', en: 'The route goes to the controller — and to the monitor as the approved corridor.' } },
+   { e: ['e9'], c: { de: 'Der Regler sieht nur die gestörte Beobachtung.', en: 'The controller sees only the corrupted observation.' } },
+   { e: ['e4'], c: { de: 'Er schlägt eine Aktion a vor (Vorschub, Rotation für Draht und Katheter).', en: 'It proposes an action a (feed and roll for wire and catheter).' } },
+   { e: ['e5'], c: { de: 'Ein Arzt-Befehl ersetzt die Aktion sofort; nur das Tempolimit bleibt.', en: 'A physician command replaces the action at once; only the speed limit remains.' } },
+   { e: ['e8'], c: { de: 'Der Monitor prüft gegen Encoder, Spitzen-Tracking, Dropouts und Kraft.', en: 'The monitor checks encoders, tip tracking, dropouts and force.' } },
+   { e: ['e6'], c: { de: 'Nur eine abgeschwächte Aktion a′ erreicht Simulator bzw. Roboter.', en: 'Only a weakened action a′ reaches the simulator or robot.' } },
+   { e: ['e7'], c: { de: 'Der Draht bewegt sich; die neue Messung kommt verrauscht, verzögert, manchmal gar nicht.', en: 'The wire moves; the new measurement arrives noisy, delayed, sometimes not at all.' } },
+   { e: ['e10', 'e11'], c: { de: 'Bewertet wird der schlechteste Fall, nicht nur der Mittelwert — plus jeder Eingriff je Regel.', en: 'Evaluation looks at the worst case, not just the mean — plus every intervention per rule.' } },
+  ],
+  detail: { de: 'Doer/Checker-Architektur wie in ISO/PAS 8800 („Safety Cage“) bzw. Simplex. Der gelernte oder optimierende Regler ist nicht verifizierbar; der kleine, deterministische Checker schon.', en: 'Doer/checker architecture as in ISO/PAS 8800 (“safety cage”) or simplex. The learned or optimising controller cannot be verified; the small, deterministic checker can.' },
+  evidence: ['blind', 'sloppySucc', 'follower', 'deadlock'],
+ },
+
+ safety: {
+  title: { de: 'Safety-Layer: was im Wrapper passiert', en: 'Safety layer: inside the wrapper' },
+  sub: { de: 'SafetyShield (Gymnasium-Wrapper) um VesselNavEnv. Später derselbe Code als ROS-2-Knoten vor dem Arbiter.', en: 'SafetyShield (Gymnasium wrapper) around VesselNavEnv. Later the same logic as a ROS 2 node in front of the arbiter.' },
+  group: { x: 250, y: 150, w: 500, h: 330, l: 'SafetyShield' },
+  nodes: [
+   { id: 'pol', x: 30, y: 60, w: 180, h: 80, k: 'core', t: { de: 'Regler', en: 'Controller' }, d: { de: 'Aktion a ∈ [−1, 1]⁴', en: 'action a ∈ [−1, 1]⁴' } },
+   { id: 'op', x: 30, y: 200, w: 180, h: 80, k: 'io', t: { de: 'Operator', en: 'Operator' }, d: { de: 'Befehl ≠ 0 → Override', en: 'command ≠ 0 → override' } },
+   { id: 'plan2', x: 30, y: 330, w: 180, h: 80, k: 'core', t: { de: 'A*-Plan', en: 'A* plan' }, d: { de: 'Pfad 0,5 mm, Radius, Abzweigungen', en: 'path 0.5 mm, radius, junctions' } },
+   { id: 'mon', x: 300, y: 190, w: 230, h: 120, k: 'safety', zoom: 'monitor', f: ['src/stroke_nav/safety/monitor.py'], t: { de: 'SafetyMonitor', en: 'SafetyMonitor' }, d: { de: 'R1–R6 + Override · nur Messgrößen · nie mehr Bewegung als verlangt', en: 'R1–R6 + override · measured inputs only · never more motion than asked' } },
+   { id: 'inj', x: 570, y: 330, w: 160, h: 110, k: 'safety', zoom: 'faults', f: ['src/stroke_nav/safety/faults.py'], t: { de: 'FaultInjector', en: 'FaultInjector' }, d: { de: 'Rauschen, Latenz, Ausfall-Bursts', en: 'noise, latency, dropout bursts' } },
+   { id: 'met', x: 300, y: 380, w: 230, h: 80, k: 'safety', f: ['src/stroke_nav/safety/report.py'], t: { de: 'Safety-Metriken', en: 'Safety metrics' }, d: { de: 'schlechtester Fall, Überschreitungsrate, je Regel', en: 'worst case, exceedance rate, per rule' } },
+   { id: 'env', x: 790, y: 190, w: 180, h: 110, k: 'core', f: ['src/stroke_nav/env/vessel_env.py'], t: { de: 'VesselNavEnv', en: 'VesselNavEnv' }, d: { de: 'TrackSim führt a′ aus', en: 'TrackSim executes a′' } },
+  ],
+  edges: [
+   { id: 's1', a: 'pol', b: 'mon', s: 1, l: 'a', ap: [210, 100], via: [[270, 100], [270, 215]], bp: [300, 215], lp: [240, 95] },
+   { id: 's2', a: 'op', b: 'mon', s: 1, l: 'override', ap: [210, 245], bp: [300, 245], lp: [250, 240] },
+   { id: 's3', a: 'plan2', b: 'mon', s: 1, l: { de: 'Korridor', en: 'corridor' }, ap: [210, 370], via: [[270, 370], [270, 285]], bp: [300, 285], lp: [238, 365] },
+   { id: 's4', a: 'mon', b: 'env', s: 1, l: 'a′', ap: [530, 245], bp: [790, 245], lp: [660, 240] },
+   { id: 's5', a: 'env', b: 'inj', l: { de: 'wahre Spitze', en: 'true tip' }, ap: [880, 300], via: [[880, 385]], bp: [730, 385], lp: [805, 380] },
+   { id: 's6', a: 'inj', b: 'mon', s: 1, l: { de: 'Messung', en: 'measured' }, ap: [570, 355], via: [[505, 355]], bp: [505, 310], lp: [538, 350] },
+   { id: 's7', a: 'inj', b: 'pol', l: { de: 'gestörte Beobachtung', en: 'corrupted observation' }, ap: [650, 440], via: [[650, 505], [15, 505], [15, 80]], bp: [30, 80], lp: [330, 500] },
+   { id: 's8', a: 'mon', b: 'met', s: 1, l: { de: 'Regeln', en: 'rules fired' }, ap: [400, 310], bp: [400, 380], lp: [400, 350] },
+  ],
+  flow: [
+   { e: ['s1', 's2', 's3'], c: { de: 'Drei Eingänge: Vorschlag des Reglers, Arzt-Befehl, freigegebener Plan.', en: 'Three inputs: the controller’s proposal, the physician command, the approved plan.' } },
+   { e: ['s4'], c: { de: 'Der Monitor gibt a′ frei: geklemmt, gestoppt oder kurz zurück — nie mehr als a.', en: 'The monitor releases a′: clamped, stopped or briefly backed off — never more than a.' } },
+   { e: ['s5'], c: { de: 'Die wahre Spitzenposition geht durch den FaultInjector …', en: 'The true tip position passes through the fault injector …' } },
+   { e: ['s6', 's7'], c: { de: '… und kommt bei Monitor und Regler gleich gestört an (Rauschen, 1 Schritt Latenz, Bursts).', en: '… and reaches monitor and controller equally corrupted (noise, 1-step latency, bursts).' } },
+   { e: ['s8'], c: { de: 'Jede Regel, die greift, wird gezählt — Grundlage der Safety-Metriken.', en: 'Every rule that fires is counted — the basis of the safety metrics.' } },
+  ],
+  detail: { de: 'Der Wrapper ändert nichts am Simulator. Er filtert nur Aktionen und verfälscht Beobachtungen, so dass jeder Regler — Skript oder SB3-Policy — unverändert getestet werden kann.', en: 'The wrapper changes nothing in the simulator. It only filters actions and corrupts observations, so any controller — script or SB3 policy — is tested unchanged.' },
+  file: 'src/stroke_nav/safety/shield.py',
+  group_f: ['src/stroke_nav/safety/shield.py'],
+  evidence: ['blind', 'pushes', 'sloppyOver', 'r4holds'],
+ },
+
+ monitor: {
+  title: { de: 'SafetyMonitor: Regel für Regel', en: 'SafetyMonitor: rule by rule' },
+  sub: { de: 'Feste Reihenfolge, jede Regel darf die Aktion nur abschwächen. Eigenschaft per Test über 500 Zufallsfälle geprüft.', en: 'Fixed order; each rule may only weaken the action. Property checked by a test over 500 random cases.' },
+  nodes: [
+   { id: 'in', x: 20, y: 70, w: 150, h: 90, k: 'io', t: { de: 'Eingang', en: 'Input' }, d: { de: 'a, Encoder, Spitze, Dropout, Kraft, Plan', en: 'a, encoders, tip, dropout, force, plan' } },
+   { id: 'ov', x: 210, y: 70, w: 150, h: 90, k: 'io', t: 'Override?', d: { de: 'Arzt ≠ 0 → nur R1', en: 'physician ≠ 0 → R1 only' } },
+   { id: 'r4', x: 400, y: 70, w: 170, h: 90, k: 'safety', t: { de: 'R4 Tracking', en: 'R4 tracking' }, d: { de: '{hold_after_dropouts} Ausfälle → halten; Sprung > Encoder-Weg → verwerfen', en: '{hold_after_dropouts} dropouts → hold; jump > encoder travel → reject' } },
+   { id: 'geo', x: 610, y: 70, w: 160, h: 90, k: 'core', t: { de: 'Geometrie', en: 'Geometry' }, d: { de: 'Abstand zum Pfad, Lumen-Zone', en: 'distance to path, lumen zone' } },
+   { id: 'r1', x: 810, y: 70, w: 170, h: 90, k: 'safety', t: { de: 'R1 Tempo', en: 'R1 speed' }, d: { de: '{zones} % nach Radius; {junction_pct} % an Abzweigungen', en: '{zones} % by radius; {junction_pct} % at junctions' } },
+   { id: 'r2', x: 810, y: 260, w: 170, h: 90, k: 'safety', t: { de: 'R2 Kontakt', en: 'R2 contact' }, d: { de: 'blockiert oder > {force_limit_N} N → {backoff_steps} Schritte zurück', en: 'blocked or > {force_limit_N} N → back off {backoff_steps} steps' } },
+   { id: 'r3', x: 610, y: 260, w: 160, h: 90, k: 'safety', t: { de: 'R3 Korridor', en: 'R3 corridor' }, d: { de: '> {corridor_mm} mm neben Plan → nicht tiefer', en: '> {corridor_mm} mm off plan → no deeper' } },
+   { id: 'r5', x: 400, y: 260, w: 170, h: 90, k: 'safety', t: { de: 'R5 Zaun', en: 'R5 fence' }, d: { de: 'max. Ziel + {overshoot_mm} mm Insertion', en: 'max. target + {overshoot_mm} mm insertion' } },
+   { id: 'r6', x: 210, y: 260, w: 150, h: 90, k: 'safety', t: { de: 'R6 Draht führt', en: 'R6 wire leads' }, d: { de: 'Katheter nie vor den Draht', en: 'catheter never ahead of wire' } },
+   { id: 'out', x: 20, y: 260, w: 150, h: 90, k: 'io', t: { de: 'Ausgang a′', en: 'Output a′' }, d: { de: 'a′ ≤ a je Achse + Liste der Regeln', en: 'a′ ≤ a per axis + rules fired' } },
+   { id: 'inv', x: 210, y: 430, w: 560, h: 110, k: 'core', f: ['tests/'], t: { de: 'Invarianten (getestet)', en: 'Invariants (tested)' }, d: { de: 'Vorschub a′ ≤ a · |Rotation a′| ≤ |a| · Rückzug höchstens −{backoff_speed} · deterministisch · keine Simulator-Wahrheit als Eingang', en: 'feed a′ ≤ a · |roll a′| ≤ |a| · back-off at most −{backoff_speed} · deterministic · no simulator ground truth as input' } },
+  ],
+  edges: [
+   { id: 'm1', a: 'in', b: 'ov' }, { id: 'm2', a: 'ov', b: 'r4', s: 1 }, { id: 'm3', a: 'r4', b: 'geo', s: 1 }, { id: 'm4', a: 'geo', b: 'r1', s: 1 },
+   { id: 'm5', a: 'r1', b: 'r2', s: 1 }, { id: 'm6', a: 'r2', b: 'r3', s: 1 }, { id: 'm7', a: 'r3', b: 'r5', s: 1 }, { id: 'm8', a: 'r5', b: 'r6', s: 1 }, { id: 'm9', a: 'r6', b: 'out', s: 1 },
+   { id: 'm10', a: 'ov', b: 'r1', d: 1, l: { de: 'bei Override: nur R1', en: 'on override: R1 only' }, ap: [285, 70], via: [[285, 38], [895, 38]], bp: [895, 70], lp: [590, 33] },
+  ],
+  flow: [
+   { e: ['m1'], n: ['in'], c: { de: 'Beispiel: Regler will mit vollem Tempo vor, a = [1, 0, 1, 0]; Spitze ist 6 mm neben dem Plan, kurz vor einer Abzweigung.', en: 'Example: the controller wants full speed, a = [1, 0, 1, 0]; the tip is 6 mm off the plan, just before a junction.' } },
+   { e: ['m2'], n: ['ov'], c: { de: 'Kein Arzt-Befehl → alle Regeln greifen.', en: 'No physician command → all rules apply.' } },
+   { e: ['m3'], n: ['r4'], c: { de: 'Messung gültig und plausibel zum Encoder → kein Halten.', en: 'Measurement valid and consistent with the encoder → no hold.' } },
+   { e: ['m4'], n: ['geo'], c: { de: 'Abstand zum Plan 6 mm; Lumen 3,5 mm → Zone 50 %.', en: 'Distance to plan 6 mm; lumen 3.5 mm → zone 50 %.' } },
+   { e: ['m5'], n: ['r1'], c: { de: 'R1: Abzweigung in Reichweite → Vorschub auf {junction_pct} % begrenzt.', en: 'R1: junction ahead → feed clamped to {junction_pct} %.' } },
+   { e: ['m6'], n: ['r2'], c: { de: 'R2: kein Wandstoß → unverändert.', en: 'R2: no blocked push → unchanged.' } },
+   { e: ['m7'], n: ['r3'], c: { de: 'R3: 6 mm > {corridor_mm} mm Korridor → Draht darf nicht tiefer, Vorschub 0.', en: 'R3: 6 mm > {corridor_mm} mm corridor → wire may not go deeper, feed 0.' } },
+   { e: ['m8'], n: ['r5'], c: { de: 'R5: Ziel noch weit → unverändert.', en: 'R5: target still far → unchanged.' } },
+   { e: ['m9'], n: ['r6', 'out'], c: { de: 'R6: Katheter würde Draht überholen → 0. Ergebnis a′ = [0, 0, 0, 0] mit R1, R3, R6 — Regler kann zurückziehen und neu drehen.', en: 'R6: catheter would overtake the wire → 0. Result a′ = [0, 0, 0, 0] with R1, R3, R6 — the controller can retract and re-roll.' } },
+  ],
+  detail: { de: 'Jede Regel gehört zu einer Gefährdung (siehe Details je Block). Die Schwellen sind Platzhalter; laut START gibt es noch keinen validierten Kraftgrenzwert.', en: 'Each rule belongs to a hazard (see each block’s details). Thresholds are placeholders; per START there is no validated force threshold yet.' },
+  file: 'src/stroke_nav/safety/monitor.py · tests/test_safety.py',
+  evidence: ['junction', 'deadlock', 'pushes', 'sloppyOver'],
+ },
+
+ faults: {
+  title: { de: 'Fehlerinjektion: wie die Messung kaputtgeht', en: 'Fault injection: how the measurement breaks' },
+  sub: { de: 'Stufen: sauber · Organisator ({org_sigma} mm, {org_drop} %, {org_lat} Schritt) · Stress ({st_sigma} mm, Bursts bis {st_burst}, +{st_fast} % bei schneller Spitze).', en: 'Levels: clean · organiser ({org_sigma} mm, {org_drop} %, {org_lat} step) · stress ({st_sigma} mm, bursts up to {st_burst}, +{st_fast} % when the tip is fast).' },
+  nodes: [
+   { id: 'true', x: 30, y: 220, w: 160, h: 90, k: 'core', t: { de: 'Wahre Spitze', en: 'True tip' }, d: { de: '3 Tracking-Punkte je Device', en: '3 tracking points per device' } },
+   { id: 'noise', x: 230, y: 220, w: 160, h: 90, k: 'safety', t: { de: 'Rauschen', en: 'Noise' }, d: 'σ = {org_sigma} … {st_sigma} mm' },
+   { id: 'lat', x: 430, y: 220, w: 160, h: 90, k: 'safety', t: { de: 'Latenz', en: 'Latency' }, d: { de: 'Warteschlange, {org_lat} Schritt (133 ms)', en: 'queue, {org_lat} step (133 ms)' } },
+   { id: 'drop', x: 630, y: 220, w: 170, h: 90, k: 'safety', t: { de: 'Ausfall-Bursts', en: 'Dropout bursts' }, d: { de: 'p + {st_fast} % wenn Spitze > {fast_mm_s} mm/s; 1–{st_burst} Frames', en: 'p + {st_fast} % when tip > {fast_mm_s} mm/s; 1–{st_burst} frames' } },
+   { id: 'pol3', x: 830, y: 120, w: 150, h: 90, k: 'core', t: { de: 'Regler', en: 'Controller' }, d: { de: 'hält letzten Wert', en: 'holds last sample' } },
+   { id: 'mon3', x: 830, y: 330, w: 150, h: 90, k: 'safety', t: 'Monitor', d: { de: 'zählt Ausfälle (R4)', en: 'counts dropouts (R4)' } },
+   { id: 'why', x: 230, y: 420, w: 570, h: 110, k: 'io', t: { de: 'Warum gehäuft bei Bewegung?', en: 'Why correlated with motion?' }, d: { de: 'Bei 4–10 Hz Durchleuchtung verschmiert ein schneller Draht (Eyberg et al. 2022). Ausfälle kommen also genau dann, wenn es am gefährlichsten ist.', en: 'At 4–10 Hz fluoroscopy a fast wire blurs (Eyberg et al. 2022). Dropouts therefore come exactly when it is most dangerous.' } },
+  ],
+  edges: [
+   { id: 'f1', a: 'true', b: 'noise' }, { id: 'f2', a: 'noise', b: 'lat' }, { id: 'f3', a: 'lat', b: 'drop' },
+   { id: 'f4', a: 'drop', b: 'pol3', l: { de: 'Beobachtung', en: 'observation' }, ap: [800, 250], via: [[815, 250], [815, 165]], bp: [830, 165], lp: [905, 112] }, { id: 'f5', a: 'drop', b: 'mon3', s: 1, l: { de: 'Messung', en: 'measurement' }, ap: [800, 285], via: [[815, 285], [815, 375]], bp: [830, 375], lp: [905, 437] },
+  ],
+  flow: [
+   { e: ['f1'], c: { de: 'Die wahre Position wird verrauscht …', en: 'The true position gets noise …' } },
+   { e: ['f2'], c: { de: '… kommt einen Schritt zu spät …', en: '… arrives one step late …' } },
+   { e: ['f3'], c: { de: '… und fällt in Bursts aus, besonders bei schneller Fahrt.', en: '… and drops out in bursts, mostly at speed.' } },
+   { e: ['f4', 'f5'], c: { de: 'Regler und Monitor bekommen dieselbe gestörte Messung — der Monitor ist nicht klüger als das System.', en: 'Controller and monitor get the same corrupted measurement — the monitor knows no more than the system.' } },
+  ],
+  detail: { de: 'Ohne diese Stufe testet man nur den Schönwetterfall. Erst mit Bursts trat der Deadlock-Defekt auf.', en: 'Without this stage you only test fair weather. The deadlock defect only appeared with bursts.' },
+  file: 'src/stroke_nav/safety/faults.py',
+  evidence: ['deadlock', 'r4holds', 'junction'],
+ },
+
+ data: {
+  title: { de: 'Anatomie & Daten', en: 'Anatomy & data' },
+  sub: { de: 'Vom VMR-Download zum Gefäßgraphen, den Planer, Simulator und Monitor teilen.', en: 'From the VMR download to the vessel graph shared by planner, simulator and monitor.' },
+  nodes: [
+   { id: 'vmr', x: 40, y: 200, w: 170, h: 100, k: 'ext', f: ['src/stroke_nav/data/fetch.py'], t: 'VMR', d: { de: '0248 + 30 Stenose-Varianten, HTTP-Range', en: '0248 + 30 stenosis variants, HTTP range' } },
+   { id: 'cl', x: 250, y: 200, w: 170, h: 100, k: 'core', f: ['src/stroke_nav/data/centerline.py'], t: { de: 'Mittellinien-Graph', en: 'Centerline graph' }, d: { de: '1-mm-Knoten, Abzweigungen, Schleifen', en: '1 mm nodes, junctions, loops' } },
+   { id: 'rad', x: 460, y: 200, w: 170, h: 100, k: 'core', t: { de: 'Lumenradius', en: 'Lumen radius' }, d: { de: 'Strahlen quer zur Mittellinie', en: 'rays across the centerline' } },
+   { id: 'occ', x: 670, y: 200, w: 150, h: 100, k: 'core', t: { de: 'Verschlüsse', en: 'Occlusions' }, d: { de: 'Lücke ≥ 3 mm → Radius 0', en: 'gap ≥ 3 mm → radius 0' } },
+   { id: 'anat', x: 460, y: 380, w: 250, h: 100, k: 'core', f: ['src/stroke_nav/data/anatomy.py'], t: 'Anatomy', d: { de: 'Ziele wie right_carotid@-5, Distanzfelder', en: 'targets like right_carotid@-5, distance fields' } },
+   { id: 'demo', x: 120, y: 380, w: 240, h: 100, k: 'safety', f: ['src/stroke_nav/safety/demo_anatomy.py'], t: { de: 'Demo-Anatomie (offline)', en: 'Demo anatomy (offline)' }, d: { de: 'synthetischer Aortenbogen bis M1, ohne Download', en: 'synthetic arch to M1, no download' } },
+  ],
+  edges: [{ id: 'd1', a: 'vmr', b: 'cl' }, { id: 'd2', a: 'cl', b: 'rad' }, { id: 'd3', a: 'rad', b: 'occ' }, { id: 'd4', a: 'rad', b: 'anat' }, { id: 'd5', a: 'demo', b: 'anat', d: 1 }],
+  detail: { de: 'Der Radius ist sicherheitsrelevant: Er bestimmt R1-Zonen, die Durchgängigkeit für A* und wo der Katheter stecken bleibt.', en: 'The radius is safety-relevant: it sets the R1 zones, passability for A*, and where the catheter gets stuck.' },
+  file: 'src/stroke_nav/data/ · src/stroke_nav/safety/demo_anatomy.py',
+ },
+
+ plan: {
+  title: { de: 'Planung: A* und Trajektorie', en: 'Planning: A* and trajectory' },
+  sub: { de: 'Global: sieht den ganzen Baum, inklusive Verschlüssen und Umwegen.', en: 'Global: sees the whole tree, including occlusions and detours.' },
+  nodes: [
+   { id: 'lim', x: 40, y: 200, w: 190, h: 100, k: 'core', f: ['src/stroke_nav/planning/constraints.py'], t: { de: 'Device-Grenzen', en: 'Device limits' }, d: { de: 'Durchmesser × 1,2, Biegeradius', en: 'diameter × 1.2, bend radius' } },
+   { id: 'astar', x: 280, y: 200, w: 200, h: 100, k: 'core', f: ['src/stroke_nav/planning/planner.py'], t: { de: 'A* über gerichtete Kanten', en: 'A* over directed edges' }, d: { de: 'harte Grenzen + weiche Kosten', en: 'hard limits + soft costs' } },
+   { id: 'traj', x: 530, y: 200, w: 200, h: 100, k: 'core', f: ['src/stroke_nav/planning/trajectory.py'], t: { de: 'Trajektorie', en: 'Trajectory' }, d: { de: 'Tempo-Profil, Rollwinkel je Abzweigung', en: 'speed profile, roll per junction' } },
+   { id: 'out2', x: 780, y: 120, w: 190, h: 90, k: 'io', t: { de: 'an Regler', en: 'to controller' }, d: 'plan.json, trajectory.csv' },
+   { id: 'out3', x: 780, y: 290, w: 190, h: 90, k: 'safety', t: { de: 'an Monitor', en: 'to monitor' }, d: { de: 'Korridor, Abzweigungen, Zielzaun', en: 'corridor, junctions, target fence' } },
+  ],
+  edges: [{ id: 'p1', a: 'lim', b: 'astar' }, { id: 'p2', a: 'astar', b: 'traj' }, { id: 'p3', a: 'traj', b: 'out2' }, { id: 'p4', a: 'traj', b: 'out3', s: 1 }],
+  detail: { de: 'Der Plan ist zugleich Sicherheitsartefakt: Er definiert, was „falscher Ast“ heißt. Deshalb gehört die Zielwahl in eine Arzt-Bestätigung.', en: 'The plan is also a safety artefact: it defines what “wrong branch” means. So target selection needs physician confirmation.' },
+  file: 'src/stroke_nav/planning/',
+ },
+
+ control: {
+  title: { de: 'Regler: austauschbare Doer', en: 'Controllers: interchangeable doers' },
+  sub: { de: 'Alle hinter derselben Schnittstelle — und alle hinter demselben Monitor.', en: 'All behind the same interface — and all behind the same monitor.' },
+  nodes: [
+   { id: 'fol', x: 40, y: 150, w: 200, h: 100, k: 'core', f: ['src/stroke_nav/agents/follower.py'], t: { de: 'A*-Follower', en: 'A* follower' }, d: { de: 'folgt der Trajektorie, zieht bei Fehlast zurück', en: 'tracks the trajectory, retracts on wrong turn' } },
+   { id: 'oracle', x: 280, y: 150, w: 200, h: 100, k: 'core', f: ['src/stroke_nav/agents/scripted.py'], t: { de: 'Skript-Oracle', en: 'Scripted oracle' }, d: { de: 'nutzt Simulator-Wissen; Obergrenze zum Vergleich', en: 'uses simulator knowledge; upper bound for comparison' } },
+   { id: 'test', x: 520, y: 150, w: 200, h: 100, k: 'io', f: ['scripts/evaluate_safety.py'], t: { de: 'Testregler', en: 'Test controllers' }, d: { de: 'forward (blind) · sloppy (unsauber) · random', en: 'forward (blind) · sloppy (imperfect) · random' } },
+   { id: 'rl', x: 760, y: 150, w: 200, h: 100, k: 'core', f: ['scripts/train_sac.py'], t: { de: 'RL-Policy (SAC)', en: 'RL policy (SAC)' }, d: { de: 'SB3, Organisator-Format, Warmstart', en: 'SB3, organiser format, warm start' } },
+   { id: 'mon4', x: 280, y: 360, w: 440, h: 100, k: 'safety', f: ['src/stroke_nav/safety/monitor.py'], t: 'SafetyMonitor', d: { de: 'gleiche Regeln, gleiche Störungen, gleiche Metriken für alle Regler', en: 'same rules, same faults, same metrics for every controller' } },
+  ],
+  edges: [{ id: 'c1', a: 'fol', b: 'mon4', s: 1 }, { id: 'c2', a: 'oracle', b: 'mon4', s: 1 }, { id: 'c3', a: 'test', b: 'mon4', s: 1 }, { id: 'c4', a: 'rl', b: 'mon4', s: 1 }],
+  detail: { de: 'Der Monitor kennt den Regler nicht. Ob Skript oder gelernte Policy: Getestet wird hinter derselben Schnittstelle, mit denselben Störungen und denselben Metriken. Die Testregler stehen für einen schlechten Regler, gegen den der Monitor schützen muss.', en: 'The monitor does not know the controller. Script or learned policy: all are tested behind the same interface, with the same faults and the same metrics. The test controllers stand in for a bad controller the monitor has to protect against.' },
+  file: 'src/stroke_nav/agents/',
+  evidence: ['sloppySucc', 'follower'],
+ },
+
+ sim: {
+  title: { de: 'Simulator: kinematisch heute, XPBD morgen', en: 'Simulator: kinematic today, XPBD tomorrow' },
+  sub: { de: 'Der Monitor hängt nicht am Simulator — er funktioniert vor TrackSim wie vor dem echten Roboter.', en: 'The monitor does not depend on the simulator — it works in front of TrackSim and of the real robot alike.' },
+  nodes: [
+   { id: 'ts', x: 60, y: 180, w: 260, h: 120, k: 'core', f: ['src/stroke_nav/env/devices.py'], t: 'TrackSim', d: { de: 'beide Devices auf einer Spur; Rollwinkel wählt Ast; Lumen-Grenze; Wandstoß als Kraft-Proxy', en: 'both devices on one track; roll picks the branch; lumen limit; wall push as force proxy' } },
+   { id: 'compat', x: 370, y: 180, w: 240, h: 120, k: 'core', f: ['src/stroke_nav/organiser/env.py'], t: { de: 'Organisator-Kompatibilität', en: 'Organiser compatibility' }, d: { de: 'gleiche Aktionen, Beobachtung, Reward, Rauschen, Device-Parameter', en: 'same actions, observation, reward, noise, device parameters' } },
+   { id: 'xpbd', x: 660, y: 180, w: 280, h: 120, k: 'ext', t: { de: 'XPBD-Browser-Sim', en: 'XPBD browser sim' }, d: { de: 'Cosserat-Stäbe, Kontaktkräfte → R2 nutzt echte Kraft', en: 'Cosserat rods, contact forces → R2 uses real force' } },
+  ],
+  edges: [{ id: 'x1', a: 'ts', b: 'compat' }, { id: 'x2', a: 'compat', b: 'xpbd', d: 1 }],
+  detail: { de: 'Heute kein Kraftmodell: R2 reagiert auf blockierte Vorschübe. Im XPBD-Stack liefert DeviceState die Spitzenkraft; dort sind Einheiten und der Force-Scale-Faktor vorher zu prüfen.', en: 'No force model today: R2 reacts to blocked pushes. In the XPBD stack DeviceState provides tip force; units and the force-scale gain must be checked first.' },
+  file: 'src/stroke_nav/env/ · src/stroke_nav/organiser/',
+ },
+
+ eval: {
+  title: { de: 'Bewertung', en: 'Evaluation' },
+  sub: { de: 'Gepaarte Seeds: jede Spalte sieht dieselben Episoden.', en: 'Paired seeds: every column sees the same episodes.' },
+  nodes: [
+   { id: 'start', x: 40, y: 180, w: 210, h: 110, k: 'core', f: ['scripts/evaluate.py', 'src/stroke_nav/eval/start_metrics.py'], t: 'evaluate.py', d: { de: 'START-Metriken mit Wilson-Intervall', en: 'START metrics with Wilson interval' } },
+   { id: 'safe', x: 290, y: 180, w: 210, h: 110, k: 'safety', f: ['scripts/evaluate_safety.py', 'src/stroke_nav/safety/report.py'], t: 'evaluate_safety.py', d: { de: 'Regler × Störstufe × Monitor an/aus', en: 'controller × fault level × monitor on/off' } },
+   { id: 'gif', x: 540, y: 180, w: 210, h: 110, k: 'core', f: ['scripts/compare_routes.py', 'src/stroke_nav/viz/'], t: 'compare_routes.py', d: { de: 'kürzester Weg vs. gerätegerechter Plan als GIF', en: 'shortest path vs. device-aware plan as a GIF' } },
+   { id: 'tests', x: 790, y: 180, w: 170, h: 110, k: 'safety', f: ['tests/'], t: { de: '{tests_total} Tests', en: '{tests_total} tests' }, d: () => {
+       const t = REPO.tests || {};
+       if (!t.ran) return { de: 'im letzten Build nicht ausgeführt', en: 'not run in the last build' };
+       return t.failed ? { de: '{tests_failed} rot, {tests_passed} grün', en: '{tests_failed} failing, {tests_passed} passing' } : { de: 'alle grün im letzten Build', en: 'all passing in the last build' };
+     } },
+   { id: 'ci', x: 290, y: 360, w: 460, h: 110, k: 'io', f: ['scripts/build_system_map.py'], t: { de: 'Diese Karte', en: 'This map' }, d: { de: 'Bei jedem Push nach main: Tests, Safety-Auswertung, build_system_map.py, GitHub Pages', en: 'On every push to main: tests, safety evaluation, build_system_map.py, GitHub Pages' } },
+  ],
+  edges: [{ id: 'v1', a: 'tests', b: 'ci', ap: [875, 290], via: [[875, 415]], bp: [750, 415] }, { id: 'v2', a: 'safe', b: 'ci', s: 1, ap: [395, 290], bp: [395, 360] }],
+  detail: { de: 'Sicherheit wird über den schlechtesten Fall bewertet: tiefster Fehleintritt, Anteil Episoden über Schwelle, Eingriffe je Regel. Ein Mittelwert verdeckt die eine Episode, die verletzt.', en: 'Safety is judged by the worst case: deepest wrong entry, share of episodes over a threshold, interventions per rule. A mean hides the one episode that injures.' },
+  file: 'scripts/ · tests/',
+  evidence: ['blind', 'sloppyOver', 'follower'],
+ },
+
+ org: {
+  title: { de: 'Organisator-Stack: wo der Monitor hingehört', en: 'Organiser stack: where the monitor belongs' },
+  sub: { de: 'Als eigener ROS-2-Knoten zwischen Policy und Arbiter. Rot umrandet: offene Punkte, die in deren Code zu prüfen sind.', en: 'As its own ROS 2 node between policy and arbiter. Red outline: open points to verify in their code.' },
+  nodes: [
+   { id: 'sac', x: 20, y: 90, w: 160, h: 90, k: 'ext', t: 'SAC-Policy', d: '/control/autonomous' },
+   { id: 'node', x: 220, y: 90, w: 180, h: 90, k: 'safety', t: { de: 'Safety-Knoten (neu)', en: 'Safety node (new)' }, d: { de: 'R1–R6, gleiche Logik', en: 'R1–R6, same logic' } },
+   { id: 'arb', x: 440, y: 90, w: 180, h: 90, k: 'ext', warn: 1, t: 'Arbiter', d: { de: '„erste Quelle ≠ 0“ — Override-Priorität prüfen!', en: '“first source ≠ 0” — check override priority!' } },
+   { id: 'udp', x: 660, y: 90, w: 150, h: 90, k: 'ext', warn: 1, t: { de: 'Adapter + UDP', en: 'Adapter + UDP' }, d: { de: 'Clamp ±20 mm/s', en: 'clamp ±20 mm/s' } },
+   { id: 'robot', x: 840, y: 90, w: 140, h: 90, k: 'ext', t: { de: 'Roboter', en: 'Robot' }, d: 'monadnock / HW' },
+   { id: 'js', x: 840, y: 300, w: 140, h: 90, k: 'ext', t: 'joint_states', d: { de: 'Encoder (m, rad)', en: 'encoders (m, rad)' } },
+   { id: 'web', x: 600, y: 300, w: 200, h: 90, k: 'ext', warn: 1, t: { de: 'XPBD-Sim (Browser)', en: 'XPBD sim (browser)' }, d: { de: 'Kräfte, Force-Scale prüfen', en: 'forces, check force scale' } },
+   { id: 'noisy', x: 360, y: 300, w: 200, h: 90, k: 'ext', t: { de: 'Rausch-Schicht', en: 'Noise layer' }, d: '/state/noisy + dropout flags' },
+   { id: 'tele', x: 220, y: 450, w: 180, h: 80, k: 'io', t: { de: 'Teleoperation', en: 'Teleoperation' }, d: { de: 'muss immer gewinnen', en: 'must always win' } },
+  ],
+  edges: [
+   { id: 'o1', a: 'sac', b: 'node', s: 1 }, { id: 'o2', a: 'node', b: 'arb', s: 1 }, { id: 'o3', a: 'arb', b: 'udp' }, { id: 'o4', a: 'udp', b: 'robot' },
+   { id: 'o5', a: 'robot', b: 'js' }, { id: 'o6', a: 'js', b: 'web' }, { id: 'o7', a: 'web', b: 'noisy' },
+   { id: 'o8', a: 'noisy', b: 'node', s: 1, l: { de: 'Messung', en: 'measurement' } }, { id: 'o9', a: 'tele', b: 'arb', l: 'override', ap: [400, 490], via: [[590, 490]], bp: [590, 180], lp: [495, 485] },
+  ],
+  detail: { de: 'Drei Punkte vor dem Einsatz: (1) Arbiter-Priorität Arzt > Monitor-Stopp > Policy; (2) eine Geschwindigkeitsgrenze an einer Stelle statt drei; (3) Kräfte unskaliert aufzeichnen.', en: 'Three points before use: (1) arbiter priority physician > monitor stop > policy; (2) one speed limit in one place instead of three; (3) record forces unscaled.' },
+  file: 'docs/ORGANISER_SETUP.md · docs/SAFETY.md',
+ },
+
+ evidence: null,
+};
+
+const PARENT = { safety: 'system', monitor: 'safety', faults: 'safety', data: 'system', plan: 'system', control: 'system', sim: 'system', eval: 'system', org: 'system' };
+const NODE_DETAIL = {
+  r1: { de: 'Gefährdung: zu schnell in kleinen Gefäßen; Fehleintritt wird erst nach der Latenz sichtbar. Die Langsamzone begrenzt, wie tief der Draht bis dahin kommt.', en: 'Hazard: too fast in small vessels; a wrong entry becomes visible only after latency. The slow zone bounds how deep the wire gets by then.' },
+  r2: () => P.r2_max === 0
+    ? { de: 'Gefährdung: Perforation, Prolaps (Draht knickt, Spitze springt). Blinder Regler: Wandstoß in {push_b} % → {push_a} % der Episoden. Ehrlich: R2 musste dabei nie eingreifen — R1 und R3 hatten ihn vorher schon gebremst. R2 ist die letzte Linie und braucht noch einen gezielten Test.', en: 'Hazard: perforation, prolapse (wire buckles, tip snaps). Blind controller: blocked push in {push_b} % → {push_a} % of episodes. To be fair: R2 never had to fire — R1 and R3 had already stopped it. R2 is the last line and still needs a targeted test.' }
+    : { de: 'Gefährdung: Perforation, Prolaps (Draht knickt, Spitze springt). Blinder Regler: Wandstoß in {push_b} % → {push_a} % der Episoden; R2 griff bis zu {r2_max}× je Episode ein.', en: 'Hazard: perforation, prolapse (wire buckles, tip snaps). Blind controller: blocked push in {push_b} % → {push_a} % of episodes; R2 fired up to {r2_max}× per episode.' },
+  r3: { de: 'Gefährdung: Dissektion, Embolie in falsches Stromgebiet. Rückzug bleibt immer erlaubt.', en: 'Hazard: dissection, embolism into the wrong territory. Retraction always stays allowed.' },
+  r4: { de: 'Gefährdung: Fahren auf veralteter oder falscher Position. Defekt gefunden: Prüfung gegen einen Schritt verwarf nach Bursts jede Messung → Roboter hielt für immer. Fix: Grenze = Encoder-Weg seit letzter gültiger Messung.', en: 'Hazard: moving on a stale or wrong position. Defect found: a one-step bound rejected every frame after bursts → robot held forever. Fix: bound = encoder travel since the last accepted frame.' },
+  r5: { de: 'Gefährdung: Verletzung distal des Ziels. Unsauberer Regler: {over_b} % → {over_a} % Episoden mehr als {overshoot_mm} mm über dem Ziel.', en: 'Hazard: injury distal to the target. Imperfect controller: {over_b} % → {over_a} % of episodes more than {overshoot_mm} mm past the target.' },
+  r6: { de: 'Gefährdung: steifere Katheterspitze ohne führenden Draht. Klinische Regel: Katheter wird über den Draht geschoben.', en: 'Hazard: stiffer catheter tip without a leading wire. Clinical rule: the catheter is advanced over the wire.' },
+  ov: { de: 'Der Arzt sieht weiter das Röntgenbild, auch wenn das Tracking ausfällt. Deshalb blockiert R4 den Arzt nicht.', en: 'The physician still sees live imaging when tracking fails. So R4 never blocks the physician.' },
+  arb: { de: 'Laut deren Doku übernimmt die erste Quelle mit Befehl ≠ 0 das Modul. Wörtlich umgesetzt könnte ein Arzt nicht übernehmen, solange die Policy sendet.', en: 'Per their docs the first source with a non-zero command owns the module. Taken literally, a physician could not take over while the policy is sending.' },
+  udp: { de: 'Im Stack stehen drei verschiedene Geschwindigkeitsgrenzen (Adapter, Policy, Sim). Für die Sicherheitsargumentation braucht es eine, an einer Stelle.', en: 'The stack has three different speed limits (adapter, policy, sim). A safety argument needs one, in one place.' },
+  web: { de: 'Kräfte kommen in µN und werden mit Faktor 80 skaliert; die „unsafe“-Schwelle liegt bei 3 N. Vor Nutzung in R2 Einheiten und Skalierung prüfen.', en: 'Forces come in µN and are scaled by 80; the “unsafe” threshold is 3 N. Check units and scaling before R2 uses them.' },
+  inv: { de: 'test_monitor_never_adds_motion prüft 500 Zufallsfälle: Vorschub nie größer, Rotation nie größer, Rückzug begrenzt.', en: 'test_monitor_never_adds_motion checks 500 random cases: feed never larger, roll never larger, back-off bounded.' },
+  fol: { de: 'Unter starken Störungen mit Monitor {fol_succ} % Erfolg, aber {fol_t_mon} statt {fol_t} s.', en: 'Under stress faults with the monitor {fol_succ} % success, but {fol_t_mon} instead of {fol_t} s.' },
+  oracle: { de: 'Liest den wahren Zustand aus dem Simulator, den ein echtes System nicht hat. Nur als Obergrenze, nicht als Kandidat für den Einsatz.', en: 'Reads the true simulator state that a real system does not have. Only an upper bound, not a deployment candidate.' },
+  test: { de: 'forward schiebt beide Devices blind vor; sloppy ist der Follower mit vollem Tempo und Rollrauschen. Sie zeigen, ob der Monitor auch einen schlechten Regler abfängt.', en: 'forward pushes both devices blindly; sloppy is the follower at full speed with roll noise. They show whether the monitor also catches a bad controller.' },
+  ci: { de: 'Struktur und Erklärungen sind von Hand; Schwellen, Tests, Messwerte und die Liste der Module kommen aus dem Repo. Neue Module ohne Platz in der Karte erscheinen rechts unter „Abgleich mit dem Repo“.', en: 'Structure and explanations are hand-written; thresholds, tests, measurements and the module list come from the repo. New modules without a place on the map show up under “Repo check” on the right.' },
+};
+
+// ------------------------------------------------------------------ rendering
+let cur = 'system', sel = null, flowRun = null;
+const svg = $('dia'), scene = $('scene');
+const el = (t, a = {}, txt) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (txt != null) e.textContent = txt; return e; };
+function wrap(text, width, px) {
+  const words = String(text).split(' '); const lines = []; let line = '';
+  const max = Math.max(8, Math.floor(width / (px * 0.55)));
+  for (const w of words) { if ((line + ' ' + w).trim().length > max && line) { lines.push(line); line = w; } else line = (line + ' ' + w).trim(); }
+  if (line) lines.push(line); return lines;
+}
+const center = n => [n.x + n.w / 2, n.y + n.h / 2];
+function clip(n, from, to) { // point where the segment from->to leaves rect n (from inside)
+  const [cx, cy] = from, dx = to[0] - cx, dy = to[1] - cy;
+  const tx = dx ? (dx > 0 ? (n.x + n.w - cx) / dx : (n.x - cx) / dx) : Infinity;
+  const ty = dy ? (dy > 0 ? (n.y + n.h - cy) / dy : (n.y - cy) / dy) : Infinity;
+  const t = Math.min(tx, ty); return [cx + dx * t, cy + dy * t];
+}
+function edgePoints(v, e) {
+  const A = v.nodes.find(n => n.id === e.a), B = v.nodes.find(n => n.id === e.b);
+  const via = e.via || []; const ca = center(A), cb = center(B);
+  const p0 = e.ap || clip(A, ca, via[0] || cb), p1 = e.bp || clip(B, cb, via.length ? via[via.length - 1] : ca);
+  return [p0, ...via, p1];
+}
+function render(id) {
+  cur = id; const v = V[id]; sel = null; stopFlow();
+  scene.textContent = '';
+  if (v.group) {
+    const g = v.group; scene.append(el('rect', { class: 'group', x: g.x, y: g.y, width: g.w, height: g.h, rx: 14 }));
+    scene.append(el('text', { class: 'gl', x: g.x + 12, y: g.y + 18 }, g.l));
+  }
+  const eg = el('g'); scene.append(eg);
+  for (const e of v.edges) {
+    const pts = edgePoints(v, e); e._pts = pts;
+    const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const path = el('path', { d, class: 'edge' + (e.s ? ' safety' : '') + (e.d ? ' dashed' : ''), 'marker-end': 'url(#ah)', 'data-e': e.id });
+    eg.append(path);
+    if (e.l) {
+      const mid = e.lp ? [e.lp[0], e.lp[1] + 5] : midpoint(pts);
+      eg.append(el('text', { class: 'elabel', x: mid[0], y: mid[1] - 5, 'text-anchor': 'middle', 'data-el': e.id }, T(e.l)));
+    }
+  }
+  for (const n of v.nodes) {
+    const miss = missing(n);
+    const g = el('g', { class: `node k-${n.k}` + (n.zoom ? ' zoomable' : '') + (n.warn ? ' warn' : '') + (miss.length ? ' missing' : ''), tabindex: 0, role: 'button', 'data-n': n.id,
+      'aria-label': T(n.t) + (n.zoom ? (LANG === 'de' ? ' — hineinzoomen' : ' — zoom in') : '') });
+    g.append(el('rect', { class: 'box', x: n.x, y: n.y, width: n.w, height: n.h, rx: 10 }));
+    const tl = wrap(T(n.t), n.w - 24, 14);
+    let y = n.y + 24;
+    for (const l of tl) { g.append(el('text', { class: 't', x: n.x + 12, y }, l)); y += 17; }
+    for (const l of wrap(T(n.d), n.w - 24, 11.5)) { if (y > n.y + n.h - (n.zoom ? 16 : 6)) break; g.append(el('text', { class: 'd', x: n.x + 12, y: y + 2 }, l)); y += 15; }
+    if (n.zoom) g.append(el('text', { class: 'z', x: n.x + n.w - 10, y: n.y + n.h - 9, 'text-anchor': 'end' }, LANG === 'de' ? '⤢ hinein' : '⤢ zoom in'));
+    if (miss.length) g.append(el('text', { class: 'miss', x: n.x + 12, y: n.y + n.h - 9 }, LANG === 'de' ? 'fehlt im Repo' : 'missing in repo'));
+    g.addEventListener('click', () => onNode(n));
+    g.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); onNode(n); } });
+    g.addEventListener('mouseenter', () => showDetail(n));
+    scene.append(g);
+  }
+  $('vTitle').textContent = T(v.title); $('vSub').textContent = T(v.sub);
+  crumbs(); showDetail(null); showEvidence(v.evidence); legend(); status(); drift();
+  $('flowBtn').hidden = !v.flow;
+}
+function midpoint(pts) { // middle of the longest segment
+  let best = 0, bi = 0; for (let i = 0; i < pts.length - 1; i++) { const L = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); if (L > best) { best = L; bi = i; } }
+  return [(pts[bi][0] + pts[bi + 1][0]) / 2, (pts[bi][1] + pts[bi + 1][1]) / 2];
+}
+function crumbs() {
+  const chain = []; let c = cur; while (c) { chain.unshift(c); c = PARENT[c]; }
+  const nav = $('crumbs'); nav.textContent = '';
+  chain.forEach((id, i) => {
+    if (i) nav.append(Object.assign(document.createElement('span'), { className: 'sep', textContent: '›' }));
+    const b = document.createElement('button'); b.className = 'crumb'; b.type = 'button';
+    b.textContent = i === 0 ? (LANG === 'de' ? 'Gesamtbild' : 'Big picture') : T(V[id].title).split(':')[0];
+    if (id === cur) b.setAttribute('aria-current', 'page'); else b.onclick = () => zoomOut(id);
+    nav.append(b);
+  });
+}
+function legend() {
+  const items = [['core', { de: 'Repo-Komponente', en: 'repo component' }], ['safety', { de: 'Safety-Layer (neu)', en: 'safety layer (new)' }], ['io', { de: 'Eingang / Mensch', en: 'input / human' }], ['ext', { de: 'Organisator-Stack', en: 'organiser stack' }]];
+  $('legend').innerHTML = items.map(([k, l]) => `<span><i style="background:var(--${k === 'core' ? 'core' : k === 'safety' ? 'safe' : k});border-color:var(--${k === 'core' ? 'core-b' : k === 'safety' ? 'safe-b' : k + '-b'})"></i>${T(l)}</span>`).join('') +
+    `<span><i style="background:transparent;border-color:var(--flow)"></i>${LANG === 'de' ? 'aktiver Schritt im Ablauf' : 'active step in the cycle'}</span>`;
+}
+function showDetail(n) {
+  const v = V[cur], box = $('detail');
+  if (!n) {
+    box.innerHTML = `<h3>${T(v.title)}</h3><p>${T(v.detail)}</p>` + (v.file ? `<div class="file">${v.file}</div>` : '');
+    return;
+  }
+  const extra = NODE_DETAIL[n.id] ? `<p>${T(NODE_DETAIL[n.id])}</p>` : '';
+  const miss = missing(n);
+  const files = n.f ? `<div class="file">${n.f.join(' · ')}</div>` : '';
+  const warn = miss.length ? `<p class="note" style="color:var(--crit)">${LANG === 'de' ? 'Im aktuellen Repo nicht gefunden: ' : 'Not found in the current repo: '}${miss.join(', ')}</p>` : '';
+  box.innerHTML = `<h3>${T(n.t)}</h3><p>${T(n.d)}</p>${extra}${warn}${files}` + (n.zoom ? `<p class="note">${LANG === 'de' ? 'Klicken zum Hineinzoomen.' : 'Click to zoom in.'}</p>` : '');
+}
+function showEvidence(keys) {
+  const box = $('evidence');
+  if (!keys || !keys.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const n = REPO.safety_episodes;
+  const sub = !S ? (LANG === 'de' ? 'In diesem Build ist keine Safety-Auswertung eingebettet.' : 'No safety evaluation embedded in this build.')
+    : (LANG === 'de' ? `Ohne → mit Safety-Layer, synthetischer Aortenbogen, ${n} gepaarte Episoden je Spalte, Stand ${shortSha()}.` : `Without → with safety layer, synthetic aortic arch, ${n} paired episodes per column, as of ${shortSha()}.`);
+  const head = `<h3>${LANG === 'de' ? 'Gemessene Wirkung' : 'Measured effect'}</h3><p class="note">${sub}</p>`;
+  box.innerHTML = head + '<div class="ev">' + keys.map(k => evItem(EV[k])).join('') + '</div>';
+}
+function evItem(x) {
+  const lab = `<div class="lab">${T(x.label)}</div>`, note = x.note ? T(x.note) : '';
+  const hist = x.hist ? `<div class="note">${LANG === 'de' ? 'einmalig gemessen während der Entwicklung' : 'measured once during development'}</div>` : '';
+  if (x.value) {
+    const v = x.value(); return `<div class="evi">${lab}<div class="nums">${v == null ? '–' : num(v) + ' ' + T(x.unit)}</div></div>`;
+  }
+  const vals = x.get ? x.get() : [x.before, x.after];
+  if (!vals || vals.some(v => v == null)) return `<div class="evi">${lab}<div class="nums">–</div></div>`;
+  const [bv, av] = vals, max = Math.max(bv, av) || 1, u = T(x.unit);
+  const tb = x.tagBefore ? T(x.tagBefore) : (LANG === 'de' ? 'ohne' : 'without'), ta = x.tagAfter ? T(x.tagAfter) : (LANG === 'de' ? 'mit' : 'with');
+  return `<div class="evi">${lab}<div class="track"><span>${tb}</span><div class="b before" style="width:${Math.max(1.5, 100 * bv / max)}%"></div><span>${ta}</span><div class="b after" style="width:${Math.max(1.5, 100 * av / max)}%"></div></div>` +
+    `<div class="nums">${num(bv)} ${u} → ${num(av)} ${u}</div>` + (note ? `<div class="note">${note}</div>` : '') + hist + '</div>';
+}
+
+// ------------------------------------------------------------------ repo check
+const ALL_NODES = Object.values(V).filter(Boolean).flatMap(v => v.nodes);
+const COVER = [...ALL_NODES.flatMap(n => n.f || []), ...Object.values(V).filter(Boolean).flatMap(v => v.group_f || [])];
+function missing(n) {
+  if (!INV.length || !n.f) return [];
+  return n.f.filter(p => !p.startsWith('tests/') && !INV.some(f => f.startsWith(p)));
+}
+function shortSha() { return (REPO.commit && REPO.commit.sha || '').slice(0, 7) || '–'; }
+function status() {
+  const box = $('status');
+  if (!REPO.commit) { box.innerHTML = `<span class="bad">${LANG === 'de' ? 'Keine Repo-Daten eingebettet: python scripts/build_system_map.py ausführen.' : 'No repo data embedded: run python scripts/build_system_map.py.'}</span>`; return; }
+  const c = REPO.commit, t = REPO.tests || {};
+  const date = c.date ? new Date(c.date).toLocaleString(LANG === 'de' ? 'de-DE' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const tests = !t.ran ? `${t.defined} ${LANG === 'de' ? 'Tests (nicht ausgeführt)' : 'tests (not run)'}`
+    : `<span class="${t.failed ? 'bad' : 'ok'}">${t.passed}/${t.passed + t.failed} ${LANG === 'de' ? 'Tests grün' : 'tests passing'}</span>`;
+  const how = REPO.ci ? (LANG === 'de' ? 'automatisch erzeugt (GitHub Actions)' : 'built automatically (GitHub Actions)') : (LANG === 'de' ? 'lokal erzeugt' : 'built locally');
+  box.innerHTML = [`<span>${LANG === 'de' ? 'Stand' : 'As of'} <b>${shortSha()}</b> · ${c.branch || ''} · ${date}</span>`, `<span>${tests}</span>`, `<span>${how}</span>`].join('');
+}
+function drift() {
+  const box = $('drift');
+  if (!INV.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const unmapped = INV.filter(f => !COVER.some(p => f.startsWith(p)));
+  const gone = ALL_NODES.filter(n => missing(n).length).map(n => `${T(n.t)} (${missing(n).join(', ')})`);
+  const h = `<h3>${LANG === 'de' ? 'Abgleich mit dem Repo' : 'Repo check'}</h3>`;
+  if (!unmapped.length && !gone.length) { box.innerHTML = h + `<p class="ok">✓ ${LANG === 'de' ? `Alle ${INV.length} Module sind in der Karte, kein Block ohne Code.` : `All ${INV.length} modules are on the map, no block without code.`}</p>`; return; }
+  box.innerHTML = h +
+    (unmapped.length ? `<p class="note">${LANG === 'de' ? 'Neu im Repo, noch ohne Platz in der Karte:' : 'New in the repo, not on the map yet:'}</p><ul>${unmapped.map(f => `<li>${f}</li>`).join('')}</ul>` : '') +
+    (gone.length ? `<p class="note bad">${LANG === 'de' ? 'Block in der Karte, Code fehlt:' : 'On the map, code missing:'}</p><ul>${gone.map(f => `<li class="bad">${f}</li>`).join('')}</ul>` : '');
+}
+
+// ------------------------------------------------------------------ zoom
+const FULL = [0, 0, 1000, 600];
+function setVB(b) { svg.setAttribute('viewBox', b.map(v => v.toFixed(1)).join(' ')); }
+function animVB(from, to, ms, done) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) { setVB(to); done && done(); return; }
+  const t0 = performance.now();
+  const step = t => { const k = Math.min(1, (t - t0) / ms), e = k < .5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    setVB(from.map((f, i) => f + (to[i] - f) * e)); if (k < 1) requestAnimationFrame(step); else done && done(); };
+  requestAnimationFrame(step);
+}
+function nodeBox(n) { const pad = 30, w = n.w + 2 * pad, h = (n.w + 2 * pad) * 0.6; return [n.x - pad, n.y + n.h / 2 - h / 2, w, Math.max(h, n.h + 2 * pad)]; }
+function onNode(n) {
+  if (!n.zoom) { sel = n; document.querySelectorAll('.node').forEach(g => g.classList.toggle('sel', g.dataset.n === n.id)); showDetail(n); return; }
+  animVB(FULL, nodeBox(n), 380, () => { scene.classList.add('fade'); setTimeout(() => { render(n.zoom); setVB(FULL); scene.classList.remove('fade'); }, 160); });
+}
+function zoomOut(id) {
+  const child = cur; render(id);
+  const n = V[id].nodes.find(x => x.zoom === child) || V[id].nodes.find(x => x.zoom && PARENT[child] === id);
+  if (n) { setVB(nodeBox(n)); animVB(nodeBox(n), FULL, 380); }
+}
+
+// ------------------------------------------------------------------ flow animation
+function stopFlow() {
+  if (flowRun) { cancelAnimationFrame(flowRun.raf); clearTimeout(flowRun.to); flowRun = null; }
+  document.querySelectorAll('.edge.hot, .elabel.hot, .node.hot').forEach(x => x.classList.remove('hot'));
+  scene.querySelectorAll('.token').forEach(t => t.remove());
+  $('caption').hidden = true; setFlowLabel();
+}
+function setFlowLabel() { $('flowBtn').textContent = flowRun ? (LANG === 'de' ? '■ Ablauf stoppen' : '■ Stop the cycle') : (LANG === 'de' ? '▶ Ablauf abspielen' : '▶ Play the cycle'); }
+function playFlow() {
+  const v = V[cur]; if (!v.flow) return;
+  stopFlow(); flowRun = { i: 0 }; setFlowLabel(); $('caption').hidden = false;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const stepFn = () => {
+    if (!flowRun) return;
+    document.querySelectorAll('.edge.hot, .elabel.hot, .node.hot').forEach(x => x.classList.remove('hot'));
+    scene.querySelectorAll('.token').forEach(t => t.remove());
+    const s = v.flow[flowRun.i];
+    $('capStep').textContent = `${flowRun.i + 1}/${v.flow.length}`; $('capText').textContent = T(s.c);
+    const edges = s.e.map(id => v.edges.find(e => e.id === id)).filter(Boolean);
+    edges.forEach(e => { scene.querySelector(`[data-e="${e.id}"]`)?.classList.add('hot'); scene.querySelector(`[data-el="${e.id}"]`)?.classList.add('hot');
+      [e.a, e.b].forEach(id => scene.querySelector(`[data-n="${id}"]`)?.classList.add('hot')); });
+    (s.n || []).forEach(id => scene.querySelector(`[data-n="${id}"]`)?.classList.add('hot'));
+    const toks = edges.map(e => { const c = el('circle', { class: 'token', r: 6 }); scene.append(c); return [c, e._pts]; });
+    const dur = 1100, t0 = performance.now();
+    const anim = t => {
+      if (!flowRun) return; const k = reduce ? 1 : Math.min(1, (t - t0) / dur);
+      toks.forEach(([c, pts]) => { const p = along(pts, k); c.setAttribute('cx', p[0]); c.setAttribute('cy', p[1]); });
+      if (k < 1) flowRun.raf = requestAnimationFrame(anim);
+      else flowRun.to = setTimeout(() => { if (!flowRun) return; flowRun.i = (flowRun.i + 1) % v.flow.length; stepFn(); }, 2300);
+    };
+    flowRun.raf = requestAnimationFrame(anim);
+  };
+  stepFn();
+}
+function along(pts, k) {
+  const seg = []; let L = 0; for (let i = 0; i < pts.length - 1; i++) { const l = Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]); seg.push(l); L += l; }
+  let d = k * L; for (let i = 0; i < seg.length; i++) { if (d <= seg[i] || i === seg.length - 1) { const f = seg[i] ? Math.min(1, d / seg[i]) : 1; return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f]; } d -= seg[i]; }
+  return pts[pts.length - 1];
+}
+$('flowBtn').onclick = () => (flowRun ? stopFlow() : playFlow());
+
+// ------------------------------------------------------------------ evidence overview + language
+$('evBtn').onclick = () => { showEvidence(['blind', 'pushes', 'sloppySucc', 'sloppyOver', 'follower', 'deadlock', 'junction', 'astar']); $('evidence').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+function setLang(l) {
+  LANG = l; document.documentElement.lang = l;
+  try { localStorage.setItem('snmap-lang', l); } catch (e) {}
+  document.querySelectorAll('.lang').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.lang === l)));
+  $('evBtn').textContent = l === 'de' ? 'Alle Wirkungsnachweise' : 'All evidence';
+  const playing = !!flowRun; render(cur); if (playing) playFlow(); setFlowLabel();
+}
+document.querySelectorAll('.lang').forEach(b => b.addEventListener('click', () => setLang(b.dataset.lang)));
+setLang(LANG);
+})();
+</script>

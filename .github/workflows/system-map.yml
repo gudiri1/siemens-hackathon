@@ -1,0 +1,71 @@
+# Rebuilds the interactive system map (docs/system_map.html) on every push and publishes it with
+# GitHub Pages: https://gudiri1.github.io/siemens-hackathon/
+#
+# What is refreshed from the repo: commit, test results, SafetyConfig thresholds, fault presets, the
+# safety evaluation (synthetic arch, 20 paired episodes per column) and the module list. Modules that
+# are not on the map, and map blocks whose code is gone, show up under "Abgleich mit dem Repo".
+#
+# One-time setup by a repo admin: Settings -> Pages -> Build and deployment -> Source: "GitHub Actions".
+
+name: system-map
+
+on:
+  push:
+    paths-ignore: ["**.md"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: system-map-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"  # NumPy 1.26 (pinned for the organiser stack) has no wheels for 3.13
+          cache: pip
+
+      - name: Install (CPU-only torch)
+        run: |
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev]"
+
+      - name: Tests
+        # a failing test must not stop the map; the map shows it in red
+        continue-on-error: true
+        run: pytest --junitxml=pytest.xml
+
+      - name: Safety evaluation (synthetic arch, ~3 min)
+        run: python scripts/evaluate_safety.py --synthetic --episodes 20 --name ci
+
+      - name: Build map
+        run: |
+          mkdir -p site
+          python scripts/build_system_map.py --junit pytest.xml --safety results/ci/safety_summary.json --out site/index.html
+          cp results/ci/safety_summary.md site/safety_summary.md
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

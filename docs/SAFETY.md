@@ -4,6 +4,14 @@ A runtime safety monitor, tracking fault injection and safety metrics for any na
 this repo (planner follower, scripted agents, trained SB3 policies). Code: `src/stroke_nav/safety/`,
 tests: `tests/test_safety.py`, evaluation: `scripts/evaluate_safety.py`.
 
+Interactive overview: **https://gudiri1.github.io/siemens-hackathon/**, a zoomable block diagram of the
+whole repo (big picture → safety layer → monitor rules → fault injection, organiser stack) with an
+animated control cycle and the measured effect of each rule. It is rebuilt on every push to `main` by
+`.github/workflows/system-map.yml`: tests, safety evaluation and thresholds come from the code, and
+modules missing from the map are listed on the page. Layout and explanations are hand-written in
+`docs/system_map.html`; `scripts/build_system_map.py` only refreshes its data block. The copy in
+`docs/` is a snapshot; open it in a browser (GitHub shows HTML files as source).
+
 ## 1. Idea: doer and checker
 
 A learned navigation policy cannot be verified the way classic safety software is (IEC 62304 class C,

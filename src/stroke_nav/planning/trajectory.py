@@ -42,6 +42,7 @@ class TrajectoryParams:
     overshoot_mm: float = 6.0
     roll_grid: int = 72
     max_duration_s: float = 300.0
+    catheter_limit_mm: float | None = None  # stop the catheter here (e.g. where lumen gets too narrow for it)
 
 
 @dataclass
@@ -286,6 +287,8 @@ def _sample_joint_reference(traj: Trajectory, sp: SimParams, wire_goal: float) -
         wire_done = L_w >= wire_goal - 0.5
         goal_c = traj.s_target if wire_done else min(traj.s_target, L_w - tp.catheter_gap_mm)
         goal_c = min(goal_c, L_w)
+        if tp.catheter_limit_mm is not None:
+            goal_c = min(goal_c, tp.catheter_limit_mm)
         v_c = min(v_c_max, max(float(np.interp(L_c, s, v_ref)), v_floor))
         L_c += float(np.clip(goal_c - L_c, 0.0, v_c * dt))
         out_t.append(k * dt)
@@ -293,7 +296,8 @@ def _sample_joint_reference(traj: Trajectory, sp: SimParams, wire_goal: float) -
         out_pw.append(phi_w)
         out_Lc.append(L_c)
         out_pc.append(phi_c)
-        if wire_done and L_c >= traj.s_target - 0.25:
+        cath_goal = traj.s_target if tp.catheter_limit_mm is None else min(traj.s_target, tp.catheter_limit_mm)
+        if wire_done and L_c >= cath_goal - 0.25:
             break
     traj.t = np.array(out_t)
     traj.L_wire = np.array(out_Lw)

@@ -9,3 +9,9 @@ __pycache__/
 
 # organiser challenge archive (2.2 GB) - never commit
 /Hackathon.zip
+
+# hand-over bundles and organiser artefacts kept locally
+/handover/
+/existing code base/
+/rl-online-rl-pool-*/
+/vla-*/

@@ -17,6 +17,10 @@ py -3.12 -m venv --system-site-packages .venv
 .venv\Scripts\pip install -e .[viz,dev]
 ```
 
+The dependencies are pinned to the organiser's toolchain so trained models load on their side:
+NumPy 1.26.4, Gymnasium 1.4.0, Stable-Baselines3 2.9.0 and PyTorch 2.14.1 on Python 3.12.
+For GPU training, install a CUDA build of PyTorch 2.14.1 (the organiser uses cu130).
+
 ## 1. Download a model
 
 ```bash
@@ -166,6 +170,25 @@ Example results on 0248, reference variant with 85% right ICA stenosis, target r
 The detour through the circle of Willis is geometrically feasible, but it is not a standard clinical approach.
 Use `--forbid` to exclude collateral vessels.
 
+## 5. Hand over to the organiser
+
+The organiser's stack (OpenNG3 plus the EndoNav/CatForce simulator and `openng3_rl` SAC) is documented
+in [docs/ORGANISER_SETUP.md](docs/ORGANISER_SETUP.md). `src/stroke_nav/organiser/` reproduces their RL
+interface on top of our simulator. That covers their action and observation spaces, reward, success
+rule, noise, device parameters, scenario and SAC settings. It also contains the fitted transform
+between our VMR anatomy and their world frame (median 0.45 mm). What we train can therefore be
+dropped into their `runs/` folder:
+
+```bash
+.venv\Scripts\python.exe scripts/train_sac.py --total-timesteps 50000              # organiser-format run folder
+.venv\Scripts\python.exe scripts/check_handover.py --run-dir runs/<run_id>          # validates like their evaluation
+.venv\Scripts\python.exe scripts/export_handover.py --run-dir runs/<run_id> --plan-target right_carotid_external@21
+```
+
+[docs/HANDOVER.md](docs/HANDOVER.md) lists what is identical, what is approximate and what is missing,
+and gives the exact commands to run on their side. The organiser's own 210k-step checkpoint loads in
+our compatible environment with identical spaces.
+
 ## Environment (`stroke_nav.env.vessel_env.VesselNavEnv`)
 
 - **Action** `Box(-1, 1, (4,))`: speeds scaled by `v_max` (default 40 mm/s) and `w_max` (default 180 °/s) per device, at 7.5 Hz.
@@ -188,7 +211,7 @@ Use `--forbid` to exclude collateral vessels.
   `RandomAgent` is the lower bound.
 - `agents/follower.py`: `TrajectoryFollower` executes planned trajectories.
   It reaches 100% of random CCA, ICA, M1, A1 and vertebral targets on both the stenosis and the occlusion variant, at about 1.5 times the oracle's time, because it respects the speed profile.
-- `pytest -q`: 32 tests on synthetic vessel trees. They cover:
+- `pytest -q`: 45 tests, mostly on synthetic vessel trees. They cover:
   - env API conformance, determinism and the parser
   - oracle success on every branch and the need for rotation
   - START metrics
@@ -197,6 +220,7 @@ Use `--forbid` to exclude collateral vessels.
   - trajectory speed, acceleration and ordering limits
   - the follower succeeding where shortest-path execution gets stuck
   - occlusion detection
+  - the organiser interface: spaces, state layout, reward, success rule, run-folder validation, model pickling and class path, frame round trips
 
 ## Data license and acknowledgement
 

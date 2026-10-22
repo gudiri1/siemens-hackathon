@@ -43,6 +43,9 @@ DEVICES: dict[str, DeviceSpec] = {
     "guidewire": DeviceSpec("guidewire 0.014in", outer_diameter_mm=0.36, min_bend_radius_mm=1.0),
     "microcatheter": DeviceSpec("microcatheter 1.7F", outer_diameter_mm=0.57, min_bend_radius_mm=2.0),
     "guide6f": DeviceSpec("guide catheter 6F", outer_diameter_mm=2.0, min_bend_radius_mm=10.0),
+    # Devices used by the organiser's simulator (device-parameters.json presets "radifocus", "judkins").
+    "radifocus_035": DeviceSpec("guidewire 0.035in (radifocus)", outer_diameter_mm=0.89, min_bend_radius_mm=3.0),
+    "judkins_5f": DeviceSpec("catheter 5F (judkins)", outer_diameter_mm=1.67, min_bend_radius_mm=8.0),
 }
 
 

@@ -7,12 +7,15 @@ name = "stroke-nav"
 version = "0.1.0"
 description = "RL playground for guidewire + microcatheter navigation in patient-specific cerebrovascular anatomy (stroke thrombectomy)"
 requires-python = ">=3.10"
+# Versions pinned to the organiser's openng3_rl stack so trained models load on their side
+# (see docs/HANDOVER.md): NumPy 1.26 pickles, Gymnasium 1.4.0, Stable-Baselines3 2.9.0.
 dependencies = [
-    "numpy",
+    "numpy==1.26.4",
     "scipy",
-    "gymnasium>=1.0",
-    "stable-baselines3>=2.4",
-    "torch",
+    "gymnasium==1.4.0",
+    "stable-baselines3==2.9.0",
+    "torch>=2.4",
+    "pillow>=10,<13",
     "matplotlib",
     "requests",
     "pandas",
@@ -20,8 +23,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-viz = ["pyvista", "vtk", "imageio"]
-dev = ["pytest"]
+viz = ["pyvista", "vtk", "imageio", "imageio-ffmpeg"]
+dev = ["pytest", "pyarrow", "pandas"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

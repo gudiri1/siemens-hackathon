@@ -1,0 +1,251 @@
+# Organiser setup (HCMR-EV) — reference
+
+A reference for the organiser's code base, as delivered in `Hackathon.zip`. File paths are relative to its
+`Hackathon/` folder. A source-only copy is extracted at `C:\Users\prabh\Documents\hackathon\Hackathon_extract\Hackathon`.
+How our work plugs into this stack is described in [HANDOVER.md](HANDOVER.md).
+
+The values below were read from the code and the run snapshots on 2026-10-22. Items marked *(doc)* come
+from the organiser's own documentation and were not checked against code.
+
+## 1. What it is
+
+A two-module endovascular robot:
+
+- **Module 1** advances and rotates the **guidewire**.
+- **Module 2** advances and rotates the **catheter**.
+
+That gives 4 degrees of freedom in total. The same control stack drives either a simulator or real
+hardware.
+
+| Sub-project | Role |
+|---|---|
+| `HCMR-EV-OpenNG3` | ROS 2 Jazzy orchestrator (`./sys`). Arbitrates Twist commands from teleoperation, Xbox, RQT and autonomous sources, and runs the UDP bridge to the robot model or the hardware. |
+| `HCMR-EndoNavSimDocker` | "CatForce" physics simulator running in the browser, with its ROS bridge, a sensor-noise layer, a LeRobot recorder and a dataset viewer. |
+| `HCMR-EV-RL` | `openng3_rl`, a Gymnasium environment plus SAC training and evaluation. |
+| `HCMR-EV-Integration` | Integration contract, hand-off notes and the episode reset coordinator. |
+| `HCMR-EV-LeRobot_Training` | Offline imitation learning (ACT, SmolVLA) on recorded datasets. |
+| Monadnock *(doc)* | Generated robot model and simulation HAL. Delivered only as a Docker image (`monadnock-sim`). |
+
+## 2. Data flow
+
+```
+policy / RQT / Xbox / PIM ── Twist ──> /control/<source>/module_<n>/cmd_vel
+   └─ arbiter (first non-zero source owns a module; 0.35 s source timeout) ──> /module_<n>/cmd_vel
+      └─ adapter ──> /ng3/controller/joint_trajectory (velocities only)
+         └─ ros_to_udp ── UDP :47100 ──> monadnock-sim | Speedgoat 192.168.7.2 | remote VNG33
+            └─ UDP :47101 ── udp_to_ros ──> /ng3/joint_states (m, rad)
+               └─ joint_state_follower ──> /endovascular/{guidewire,catheter}/command (DeviceCommand, mm/deg)
+                  └─ WebSocket :18765-18768 ──> browser physics page (catheter_guidewire_ros2.html, 60 Hz)
+                     ├─ /endovascular/<dev>/state, contact forces, /imaging/simulation/compressed (ground truth)
+                     └─ sensor_sim noise ──> /endovascular/<dev>/state/noisy + noisy viewer (:18769)
+                          └─ /endovascular/imaging/noisy/compressed ──> RL env and LeRobot recorder
+reset: Trigger service /hcmr/episode/reset (reset_coordinator)     TensorBoard :6006   dataset viewer :8090
+```
+
+Everything runs on ROS domain 42 with Fast DDS, over the Docker network `hcmr-ev-integration`.
+
+Sources:
+- `HCMR-EV-Integration/INTEGRATION_CONTRACT.md`
+- `HCMR-EV-OpenNG3/src/bridge/config/bridge.yaml`
+- `HCMR-EV-RL/compose.yaml`
+
+The simulator pages are:
+
+- Two-device page: http://localhost:8000/catheter_guidewire_ros2.html
+- Single-wire page: http://localhost:8000/guidewire_simulation_ros2.html
+- Noisy viewer: http://localhost:8001/noisy_visualization_ros2.html
+
+## 3. Simulator (EndoNav / CatForce)
+
+- **Physics.** JavaScript in the browser, not SOFA. Two 3D Cosserat rods are solved with direct XPBD,
+  with the guidewire running coaxially inside the catheter lumen. It runs at 60 Hz, with 5 substeps and
+  2 iterations by default.
+  - Source: `HCMR-EndoNavSimDocker/src/catforce_ros_bridge/web/catheter_guidewire_ros2.html`.
+  - SOFA/stEVE appears only as an optional legacy visualiser in OpenNG3.
+- **Devices.** The run snapshot that SAC was trained with
+  (`HCMR-EV-RL/runs/online-rl-pool-20261021-145046-707530Z/device-parameters.json`, schema 1, 42 controls) uses:
+
+  | | Preset | Diameter | Length | Tip length | Tip angle | Bodies |
+  |---|---|---|---|---|---|---|
+  | Guidewire | `radifocus` (0.035") | 0.89 mm | 1.2 m | 30 mm | 45° | 160 |
+  | Catheter | `judkins` (5F) | 1.67 mm | 0.9 m | 28 mm | 70° | 56 |
+
+  - A 0.014" preset (`synchro2`) exists.
+  - The catheter diameter slider starts at 0.60 mm, so a 1.7F (0.57 mm) microcatheter is just out of range.
+  - UI limits: insertion −50 to 800 mm, roll ±1080°.
+  - Default feed rate 45 mm/s, spin rate 180°/s.
+- **"Fluoro" image.** Not an X-ray simulation.
+  - It is a 480×480 JPEG perspective WebGL render of the vessel (dark red), a cyan grid, the devices and
+    an orange goal marker, from a fixed oblique camera.
+  - It is published at up to 20 Hz on `/endovascular/imaging/noisy/compressed`.
+  - The RL bridge converts it to greyscale and resizes it to 128×128 (`openng3_rl/ros_io.py`).
+- **Noise** (`HCMR-EndoNavSimDocker/src/sensor_sim/config/noise_params.yaml`):
+  - tip position σ 0.1 mm
+  - tip dropout probability 0.07
+  - 50–150 ms latency
+- **Units and frames.** SI inside the simulator.
+  - World frame = mesh × `meters_per_unit` (0.01, so cm become m).
+  - The device entry is at the origin, and insertion runs along +Z (bake mode "authored").
+  - `DeviceState` reports insertion in m, rotation in rad, and poses in m in the world frame.
+- **Scenario `cas-reference`** (`HCMR-EV-RL/scenarios/cas-reference/`):
+  - `vessel.obj` is identical to `HCMR-EndoNavSimDocker/meshes/Mesh_1/0248_H_AOCERE_CAS_reference_10k.obj`:
+    sha256 `04fbd581…`, 4,995 vertices, 10,000 faces, in cm.
+  - It is VMR model 0248 (reference variant 40Left85Right), decimated, rotated about 19.5° and translated.
+    We fitted the transform to our VMR anatomy ourselves: median residual 0.45 mm. See HANDOVER.md.
+  - `goals.txt` holds one goal, `7.001,9.756,15.350` (mesh cm), which is the world goal [0.07001, 0.09756, 0.1535] m.
+    It lies 21 mm into the **right external carotid**, just past the right carotid bifurcation.
+  - The header claims "OBJ LPS (R and A negated)", but the geometry shows no axis flip relative to VMR.
+  - Goal file format: one `x,y,z` row per goal, `#` comments allowed, and a uniform pick per episode.
+  - `configs/goals.json` is an alternative curriculum: offsets of 15–180 mm along +Z from the
+    post-reset guidewire tip, in groups near, medium and far.
+
+## 4. RL interface (`HCMR-EV-RL/src/openng3_rl`)
+
+| Item | Value | Source |
+|---|---|---|
+| Environment | `OpenNG3Env(gym.Env)`, frame-synchronised, real time | `env.py` |
+| Action | `Box(-1, 1, (4,), float32)` = [gw_trans, gw_rot, cath_trans, cath_rot]; scaled to ±0.01 m/s and ±1 rad/s; sent as Twist on `/control/autonomous/module_{1,2}/cmd_vel` with linear.x in **mm/s** and angular.z in rad/s | `action.py`, `ros_io.py` |
+| Control rate | 5 Hz on a fixed wall-clock grid; each step waits for a synchronised image + state packet (skew ≤ 0.1 s, timeout 2 s gives `stale_abort`) | `env.py`, `configs/online_rl.json` |
+| Observation | `Dict(image=Box(0,255,(1,128,128),uint8), state=Box(-10,10,(43,),float32))`, built only from **noisy** topics | `observation.py` |
+| Reward | `clip(Δdistance / 0.01 m, ±1) − force·dt / 0.01 − 0.02·mean(Δaction²) − 0.001 + 10·success − 10·unsafe`, using the **ground-truth Euclidean** distance from the guidewire tip to the goal | `reward.py`, `env.py` |
+| Success / unsafe | Guidewire tip within 5 mm for 3 consecutive steps / peak force > 3 N | `configs/online_rl.json` |
+| Episode | 600 steps (120 s); the `EnvConfig` default and README say 300 | `configs/online_rl.json` |
+| Reset | Trigger `/hcmr/episode/reset`; the goal is sampled after reset (curriculum goals are relative to the reset tip) | `env.py`, `goal.py` |
+
+State vector layout (43 values, clipped to ±10; positions in world metres):
+
+| Index | Content |
+|---|---|
+| 0–6 | guidewire tip position (3) + orientation quaternion x, y, z, w (4) |
+| 7–13 | catheter tip position (3) + quaternion (4) |
+| 14–24 | guidewire aux: tip velocity (3, m/s), insertion depth (m), sin(roll), cos(roll), log1p(tip force), log1p(peak force), log1p(contact count), tip dropout flag, force dropout flag |
+| 25–35 | catheter aux (same layout) |
+| 36–38 | goal − guidewire tip (m) |
+| 39–42 | previous action |
+
+Further details:
+- **Quirk:** the "previous action" (39–42) in the observation returned by `step(a_t)` is `a_{t-1}`,
+  not `a_t`. The observation is built before `_prev_action` is updated (`env.py`, around line 186).
+- During a dropout, the last good sample is held.
+- The tip quaternion's local +Z points along the tip. We inferred this from recorded data.
+- Segment poses are ordered from proximal (index 0) to the tip.
+
+**Policy and training** (`training.py`, `policy.py`, `configs/online_rl.json`):
+- Stable-Baselines3 `SAC("MultiInputPolicy")` with `features_extractor_class=openng3_rl.policy.FluoroStateExtractor`:
+  - a CNN on the image (32-64-64 conv layers, then 256 features)
+  - an MLP on the state (128-128)
+- Hyperparameters:
+  - learning rate 3e-4, buffer 50,000, learning starts 2,000, batch 256
+  - γ 0.99, τ 0.005, train_freq 1 step
+  - gradient steps 1 for a single worker, −1 for pools
+  - 1,000,000 total steps, checkpoint every 10,000 steps (`checkpoints/sac_<N>_steps.zip`), seed 0
+- Versions recorded in their model: Python 3.12.3, SB3 2.9.0, Gymnasium 1.4.0, PyTorch 2.14.1+cu130, NumPy 1.26.4.
+
+**Run folder** (`HCMR-EV-RL/runs/<run_id>/`):
+- `resolved-config.json` (schema 1, with scenario name and mesh hash, plus the device-parameters file and sha256)
+- `device-parameters.json`
+- `scenario.json` (must equal the scenario manifest)
+- `status.json`, `checkpoints/`, replay buffers, `tensorboard/`, `final-model.zip`
+- `evaluations/<id>/{status,episodes}.json`
+- `runs/latest-run.txt` names the newest run.
+
+The evaluation refuses a run whose device parameters, scenario manifest or mesh hash differ from the live
+simulator (`evaluation.py`, `device_parameters.py`).
+
+**Commands**, run from `HCMR-EV-OpenNG3` (`./sys`):
+
+```bash
+./sys startup --mode rl --scenario cas-reference [--visible]          # train SAC
+./sys startup --mode showcase --scenario cas-reference --run-id RUN_ID \
+    --model checkpoints/sac_10000_steps.zip --episodes 10 [--visible]  # evaluate + record rollouts
+./sys pool start fast --workers 2 --scenario cas-reference --gpu GPU-UUID   # experimental parallel pool
+./sys startup --mode vla                                              # teleoperation recording
+```
+
+## 5. Control interfaces and units (`HCMR-EV-Integration/INTEGRATION_CONTRACT.md`)
+
+- **Autonomous control path.**
+  - Publish Twist on `/control/autonomous/module_<n>/cmd_vel` at 5 Hz or more (20 Hz recommended):
+    linear.x in mm/s, angular.z in rad/s.
+  - Template: `HCMR-EV-OpenNG3/src/bridge/scripts/algorithm_control_template.py`
+    (`AlgorithmControllerBase.compute_command(module_id, feedback)`).
+  - The bridge clamps to ±20 mm/s and ±5 rad/s.
+  - Commands are **velocity-only**.
+- **Direct simulator path.** Publish `catforce_interfaces/msg/DeviceCommand` on `/endovascular/{guidewire,catheter}/command`.
+  - Fields: absolute `insertion_setpoint` (mm), `rotation_setpoint` (deg), `enabled: true`.
+  - The two-device page latches each setpoint and tracks it at the feed and spin rates.
+  - `frames` matters only on the single-wire page (3 frames = 20 Hz).
+  - Source: `HCMR-EndoNavSimDocker/src/catforce_ros_bridge/ROS2_INTERFACE.md`.
+- **Feedback.**
+  - `/ng3/joint_states` in m and rad, relative to the first sample.
+  - `/endovascular/<dev>/state` (`DeviceState`) carries insertion depth (m), shaft rotation (rad), tip pose and twist,
+    segment poses, and forces (proximal, contact, tip, axial, peak, wall friction, viscous, elastic…).
+  - `NoisyDeviceState` is the same with noise and dropout flags.
+- **Reset coordinator** (`HCMR-EV-Integration/reset_coordinator/`): a fail-closed transaction of 15 s or less:
+  1. recorder prepare
+  2. reset inhibit
+  3. follower off
+  4. restart the plant
+  5. wait until stationary
+  6. simulator reset
+  7. noise reset
+  8. follower on, then release
+
+## 6. Datasets (LeRobot v3.0)
+
+The recorder writes `data/chunk-000/file-000.parquet`, `videos/observation.images.fluoro/...mp4` and
+`meta/{info.json, episode_outcomes.json, tasks.parquet, stats.json}`. Features:
+
+- `observation.images.fluoro`: 480×480×3 video
+- `observation.state` [30]: per device, tip position (m), quaternion, linear and angular velocity, proximal force (N), tip force (N)
+- `observation.guidewire_segment_poses` [160, 7] and `observation.catheter_segment_poses` [56, 7], in world m
+- `action` [4]: guidewire mm/s, rad/s, catheter mm/s, rad/s
+- `episode_outcome`, `timestamp`, `frame_index`, `episode_index`, `task_index`
+
+Teleoperation is recorded at 20 fps and RL rollouts at 5 fps. `HCMR-EV-LeRobot_Training` trains ACT
+(100k steps) or SmolVLA (20k steps, from `lerobot/smolvla_base`) with `lerobot==0.6.0`.
+
+## 7. Requirements
+
+- Linux or WSL2 with Docker and Compose v2. Ubuntu 24.04 is recommended. Native Linux Chromium is needed for pools.
+- ROS 2 Jazzy, an NVIDIA GPU for training (their image uses CUDA 13.0 PyTorch), and Chrome or Chromium for the physics page.
+- Python 3.12. `openng3_rl` pins `gymnasium==1.4.0` and `stable-baselines3==2.9.0`; the container has NumPy 1.26.4.
+
+## 8. Results so far (in the delivered snapshot)
+
+- **Deterministic evaluations: 0% success everywhere.**
+  - Run `online-rl-20261021-073747` at 10k steps: 2×10 episodes.
+  - Pool run `114214` at 10k steps: 10 episodes, final distance about 82 mm.
+- **4-worker pool `145046`:** 95 successes in 394 stochastic training episodes. That was at 193,820 steps,
+  10.4 transitions/s and about 5.2 h, and it was still training when the snapshot was taken.
+- A later checkpoint, `sac_210000_steps.zip`, was provided separately.
+- `docs/pool-acceptance-2026-10-21.md` reports two-worker isolation passing and a 1.55× throughput gain
+  (target 1.6×). Policy quality was not evaluated there.
+
+## 9. Open items they list
+
+These come from the sub-project `ROADMAP.md` and `HANDOFF.md` files:
+
+- unit doc mismatch between `DeviceCommand` and `ROS2_INTERFACE.md`
+- only two modules supported
+- no faster-than-real-time lockstep simulation
+- a headless or CLI simulator instead of the browser
+- OpenNG3 owning the joint trajectory
+- recorder migration to structured topics
+- remote Monadnock acceptance
+- a 4-worker pool benchmark and a policy-quality comparison
+
+No task statement, judging criteria or deadlines are included in the archive.
+
+## 10. Getting more out of `Hackathon.zip`
+
+The zip is 2.2 GB compressed and 41.9 GB extracted, and 39.8 GB of that is SAC replay buffers. Read single
+files without extracting:
+
+```python
+import zipfile
+z = zipfile.ZipFile("Hackathon.zip")
+print([n for n in z.namelist() if n.endswith(".md")])             # list
+print(z.read("Hackathon/HCMR-EV-RL/configs/online_rl.json").decode())  # read one file
+z.extract("Hackathon/HCMR-EV-RL/runs/<run>/final-model.zip", "Hackathon_extract")  # extract one file
+```

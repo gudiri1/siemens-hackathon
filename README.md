@@ -209,6 +209,9 @@ our compatible environment with identical spaces.
 
 - `agents/scripted.py`: `ScriptedOracle` uses privileged knowledge of the route and the branch rule. It reaches 100% of targets in every tested region of 0248 (CCA, ICA, M1, A1, ECA, subclavian, vertebral) and of 0050.
   `RandomAgent` is the lower bound.
+- **Second patient.** The whole pipeline also runs unchanged on `0024_H_AO_H`, a healthy aortic arch from another patient.
+  Its left common carotid shares an origin with the right one. The follower and the oracle reach all four branch ends 100% of the time, against 0–5% for random actions and 0% for pushing only.
+  Try it with `python scripts/plan_path.py --model 0024_H_AO_H --target LCCA@-2 --follow 20 --record`.
 - `agents/follower.py`: `TrajectoryFollower` executes planned trajectories.
   It reaches 100% of random CCA, ICA, M1, A1 and vertebral targets on both the stenosis and the occlusion variant, at about 1.5 times the oracle's time, because it respects the speed profile.
 - `pytest -q`: 45 tests, mostly on synthetic vessel trees. They cover:

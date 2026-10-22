@@ -166,3 +166,12 @@ def test_occlusion_detection():
     assert np.all(g.radius[20:26] == 0.0)
     assert np.all(g.radius[70:74] > 0.5)
     assert g.meta["occlusions"] and g.meta["occlusions"][0]["branch"] == "big"
+
+
+def test_follower_densify_bounds_spacing():
+    from stroke_nav.agents.follower import _densify
+
+    pts = np.array([[0.0, 0, 0], [0, 0, 10.0], [0, 0, 10.2]])
+    d = _densify(pts, 0.5)
+    assert np.allclose(d[0], pts[0]) and np.allclose(d[-1], pts[-1])
+    assert np.linalg.norm(np.diff(d, axis=0), axis=1).max() <= 0.5 + 1e-9

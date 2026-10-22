@@ -126,14 +126,24 @@ class Scene:
             lines.append(status)
         return "\n".join(lines)
 
-    def set_front_view(self, zoom: float = 1.35) -> None:
-        """Anterior (AP) view, head up, patient's left on screen right (VMR models use RAS axes)."""
+    def set_front_view(self, zoom: float | None = None) -> None:
+        """Head-up view along the anatomy's thinnest horizontal axis (VMR models use RAS axes).
+
+        For full aorta-to-brain models this is the anterior (AP) view with the patient's left on the
+        screen's right. For an isolated aortic arch, which lies in the front-to-back plane, it is a
+        lateral view so the arch and its branches do not overlap.
+        """
         a = self.env.anat
         c = a.center
         d = 3.0 * a.half_extent
-        self.pl.camera_position = [(c[0], c[1] + d, c[2]), tuple(c), (0, 0, 1)]
+        ext = a.bbox_max - a.bbox_min
+        if ext[1] <= ext[0]:
+            pos, default_zoom = (c[0], c[1] + d, c[2]), 1.35  # anterior view (camera in front of the patient)
+        else:
+            pos, default_zoom = (c[0] - d, c[1], c[2]), 0.9  # lateral view from the patient's left
+        self.pl.camera_position = [pos, tuple(c), (0, 0, 1)]
         self.pl.reset_camera(bounds=(*_interleave(a.bbox_min, a.bbox_max),))
-        self.pl.camera.zoom(zoom)
+        self.pl.camera.zoom(zoom if zoom is not None else default_zoom)
 
 
 def _interleave(lo: np.ndarray, hi: np.ndarray) -> list[float]:

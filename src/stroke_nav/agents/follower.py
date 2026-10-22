@@ -48,7 +48,10 @@ class TrajectoryFollower:
         self.k = 0
         self.retries = 0
         self.recovering: float | None = None
-        self._tree = cKDTree(self.traj.points)
+        # Densify the planned path: junction edges can be long straight jumps (a branch centerline
+        # often starts several mm inside its parent), and node-only distances would then report
+        # false deviations in the middle of such an edge.
+        self._tree = cKDTree(_densify(self.traj.points, 0.5))
         self._junction_s = [e["s_mm"] for e in self.traj.roll_events]
 
     def act(self, env: VesselNavEnv, obs=None) -> np.ndarray:
@@ -92,3 +95,13 @@ class TrajectoryFollower:
 
 def _wrap(x: float) -> float:
     return float((x + np.pi) % (2 * np.pi) - np.pi)
+
+
+def _densify(points: np.ndarray, step_mm: float) -> np.ndarray:
+    """Polyline resampled so consecutive points are at most ``step_mm`` apart."""
+    out = [points[:1]]
+    for a, b in zip(points[:-1], points[1:]):
+        n = max(int(np.ceil(np.linalg.norm(b - a) / step_mm)), 1)
+        t = np.linspace(0.0, 1.0, n + 1)[1:, None]
+        out.append(a + (b - a) * t)
+    return np.concatenate(out)
